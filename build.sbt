@@ -7,7 +7,7 @@ ThisBuild / developers := List(
 )
 ThisBuild / startYear := Some(2022)
 
-ThisBuild / crossScalaVersions := Seq(scala3, scala213)
+ThisBuild / crossScalaVersions := Seq(scala3)
 
 val vcpkgBaseDir = "C:/vcpkg/"
 ThisBuild / nativeConfig ~= { c =>
@@ -73,7 +73,8 @@ lazy val testServer = project
   .enablePlugins(NoPublishPlugin)
   .settings(
     libraryDependencies ++= Seq(
-      "org.typelevel" %% "cats-effect" % catsEffectVersion,
+      // "org.typelevel" %% "cats-effect" % catsEffectVersion,
+      "ch.epfl.lamp" %%% "gears" % gearsVersion,
       "org.http4s" %% "http4s-dsl" % http4sVersion,
       "org.http4s" %% "http4s-ember-server" % http4sVersion,
       "ch.qos.logback" % "logback-classic" % "1.4.14",
