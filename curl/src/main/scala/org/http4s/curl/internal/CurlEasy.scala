@@ -16,9 +16,8 @@
 
 package org.http4s.curl.internal
 
-import cats.effect.IO
-import cats.effect.Resource
 import org.http4s.curl.CurlError
+import org.http4s.curl.unsafe.CurlRuntimeContext
 import org.http4s.curl.unsafe.libcurl._
 import org.http4s.curl.unsafe.libcurl_const._
 
@@ -102,27 +101,24 @@ final private[curl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[
 private[curl] object CurlEasy {
   final private val CURL_ERROR_SIZE = 256L
 
-  private val createHandler: Resource[IO, Ptr[CURL]] = Resource.make {
-    IO {
-      val handle = curl_easy_init()
-      if (handle == null)
-        throw new RuntimeException("curl_easy_init")
-      handle
-    }
-  } { handle =>
-    IO(curl_easy_cleanup(handle))
-  }
+  def withEasy[T](body: CurlRuntimeContext ?=> CurlEasy => T)(using CurlRuntimeContext): T =
+    // Handle cleanup should be done by either the scheduler
+    // or appended to this cleanUp function
+    val handle: Ptr[CURL] = curl_easy_init()
+    if (handle == null)
+      throw new RuntimeException("curl_easy_init")
+    
+    val zone: Zone = Zone.open()
+    try {
+      val buf = zone.alloc(CURL_ERROR_SIZE.toULong)
+      
+      val code = curl_easy_setopt_errorbuffer(handle, CURLOPT_ERRORBUFFER, buf)
+      if (code.isError) {
+        throw CurlError.fromCode(code)
+      }
 
-  def apply(): Resource[IO, CurlEasy] =
-    for {
-      h <- createHandler
-      z <- Utils.newZone
-      buf = z.alloc(CURL_ERROR_SIZE.toULong)
-      _ <- Resource.eval(IO {
-        val code = curl_easy_setopt_errorbuffer(h, CURLOPT_ERRORBUFFER, buf)
-        if (code.isError) {
-          throw CurlError.fromCode(code)
-        }
-      })
-    } yield new CurlEasy(h, buf)
+      body(CurlEasy(handle, buf))
+    } finally {
+      zone.close()
+    }
 }

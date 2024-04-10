@@ -16,70 +16,41 @@
 
 package org.http4s.curl.http
 
-import cats.effect._
-import cats.effect.std._
-import fs2.Pipe
 import org.http4s.curl.internal.Utils
 import org.http4s.curl.unsafe.libcurl_const
-import scodec.bits.ByteVector
 
 import scalanative.unsafe._
+import scalanative.libc.string._
 import scalanative.unsigned._
+import scala.collection.mutable.ArrayBuffer
 
 final private[curl] class RequestSend private (
-    flowControl: FlowControl,
-    requestBodyChunk: Ref[SyncIO, Option[ByteVector]],
-    requestBodyQueue: Queue[IO, Unit],
-    dispatcher: Dispatcher[IO],
+    val content: Array[Byte],
+    var offset: Int,
 ) {
-  def pipe: Pipe[IO, Byte, Nothing] = _.chunks
-    .map(_.toByteVector)
-    .noneTerminate
-    .foreach { chunk =>
-      requestBodyQueue.take *> requestBodyChunk.set(chunk).to[IO] *> flowControl.unpauseSend
-    }
-
   def onRead(
       buffer: Ptr[CChar],
       size: CSize,
       nitems: CSize,
   ): CSize =
-    requestBodyChunk
-      .modify {
-        case Some(bytes) =>
-          val (left, right) = bytes.splitAt((size * nitems).toLong)
-          (Some(right), Some(left))
-        case None => (None, None)
-      }
-      .unsafeRunSync() match {
-      case Some(bytes) if bytes.nonEmpty =>
-        bytes.copyToPtr(buffer, 0)
-        bytes.length.toULong
-      case Some(_) =>
-        dispatcher.unsafeRunAndForget(
-          flowControl.onSendPaused.to[IO] *> requestBodyQueue.offer(())
-        )
-        libcurl_const.CURL_READFUNC_PAUSE.toULong
-      case None => 0.toULong
-    }
+    if offset >= content.length then return Size.intToSize(0).toUSize
+    val contentPtr = content.at(offset)
+    val copyAmount = Math.min(size.toInt * nitems.toInt, content.length - offset)
+    val copyAmountUSize = Size.intToSize(copyAmount).toUSize
+    memcpy(buffer, contentPtr, copyAmountUSize)
+    offset += copyAmount
+    copyAmountUSize
 }
 
 private[curl] object RequestSend {
-  def apply(flowControl: FlowControl): Resource[IO, RequestSend] = for {
-    requestBodyChunk <- Ref[SyncIO].of(Option(ByteVector.empty)).to[IO].toResource
-    requestBodyQueue <- Queue.synchronous[IO, Unit].toResource
-    dispatcher <- Dispatcher.sequential[IO]
-  } yield new RequestSend(
-    flowControl,
-    requestBodyChunk,
-    requestBodyQueue,
-    dispatcher,
-  )
+  def apply(content: String): RequestSend =
+    val bytes = content.getBytes()
+    new RequestSend(bytes, 0)
+
   private[curl] def readCallback(
       buffer: Ptr[CChar],
       size: CSize,
       nitems: CSize,
       userdata: Ptr[Byte],
   ): CSize = Utils.fromPtr[RequestSend](userdata).onRead(buffer, size, nitems)
-
 }

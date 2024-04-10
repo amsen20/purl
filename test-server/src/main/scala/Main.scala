@@ -23,6 +23,7 @@ import org.http4s.ember.server.EmberServerBuilder
 object Main extends IOApp.Simple {
 
   override def run: IO[Unit] =
+    IO.println("Hello, World!")
     EmberServerBuilder
       .default[IO]
       .withHttpWebSocketApp(TestServer(_))

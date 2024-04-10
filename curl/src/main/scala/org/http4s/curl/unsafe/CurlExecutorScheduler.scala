@@ -16,26 +16,48 @@
 
 package org.http4s.curl.unsafe
 
-import cats.effect.IO
-import cats.effect.kernel.Resource
-import cats.effect.unsafe.PollingExecutorScheduler
 import org.http4s.curl.CurlError
 
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
+import scala.concurrent.ExecutionContext
+import scala.concurrent.JavaConversions._
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
 
 final private[curl] class CurlExecutorScheduler(multiHandle: Ptr[libcurl.CURLM], pollEvery: Int)
-    extends PollingExecutorScheduler(pollEvery) {
+    extends CurlRuntimeContext {
 
   private val callbacks = mutable.Map[Ptr[libcurl.CURL], Either[Throwable, Unit] => Unit]()
 
-  def poll(timeout: Duration): Boolean = {
-    val timeoutIsInf = timeout == Duration.Inf
-    val noCallbacks = callbacks.isEmpty
+  @volatile private var running = true
+  @volatile private var exception = Option.empty[Throwable]
 
-    if (timeoutIsInf && noCallbacks) false
+  def loop(): Unit =
+    while (synchronized(running)) {
+      val until = System.currentTimeMillis() + pollEvery
+
+      try
+        poll(Duration(until - System.currentTimeMillis(), "ms"))
+      catch {
+        case e =>
+          synchronized:
+            callbacks.foreach(_._2(Left(e)))
+            callbacks.clear()
+            exception = Some(e)
+            running = false
+      }
+
+      val sleepAmount = until - System.currentTimeMillis()
+      if sleepAmount > 0 then Thread.sleep(until - System.currentTimeMillis())
+    }
+
+  def poll(timeout: Duration): Boolean = {
+    println("poll begin")
+    val timeoutIsInf = timeout == Duration.Inf
+    val noCallbacks = synchronized(callbacks.isEmpty)
+
+    val r = if (timeoutIsInf && noCallbacks) false
     else {
       val timeoutMillis =
         if (timeoutIsInf) Int.MaxValue else timeout.toMillis.min(Int.MaxValue).toInt
@@ -51,7 +73,7 @@ final private[curl] class CurlExecutorScheduler(multiHandle: Ptr[libcurl.CURLM],
         )
 
         if (pollCode.isError)
-          throw CurlError.fromMCode(pollCode)
+          throw CurlError.fromMCode(pollCode) // FIXME what to do here?
       }
 
       if (noCallbacks) false
@@ -70,17 +92,19 @@ final private[curl] class CurlExecutorScheduler(multiHandle: Ptr[libcurl.CURLM],
             val curMsg = libcurl.curl_CURLMsg_msg(info)
             if (curMsg == libcurl_const.CURLMSG_DONE) {
               val handle = libcurl.curl_CURLMsg_easy_handle(info)
-              callbacks.remove(handle).foreach { cb =>
-                val result = libcurl.curl_CURLMsg_data_result(info)
-                cb(
-                  if (result.isOk) Right(())
-                  else Left(CurlError.fromCode(result))
-                )
-              }
+              synchronized:
+                callbacks.remove(handle).foreach { cb =>
+                  val result = libcurl.curl_CURLMsg_data_result(info)
+                  cb(
+                    if (result.isOk) Right(())
+                    else Left(CurlError.fromCode(result))
+                  )
+                }
 
               val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
               if (code.isError)
                 throw CurlError.fromMCode(code)
+              libcurl.curl_easy_cleanup(handle)
             }
             true
           } else false
@@ -89,6 +113,9 @@ final private[curl] class CurlExecutorScheduler(multiHandle: Ptr[libcurl.CURLM],
         !runningHandles > 0
       }
     }
+
+    println("poll end")
+    r
   }
 
   /** Adds a curl handler that is expected to terminate
@@ -101,48 +128,65 @@ final private[curl] class CurlExecutorScheduler(multiHandle: Ptr[libcurl.CURLM],
     * @param handle curl easy handle to add
     * @param cb callback to run when this handler has finished its transfer
     */
-  def addHandle(handle: Ptr[libcurl.CURL], cb: Either[Throwable, Unit] => Unit): Unit = {
+  override def addHandle(handle: Ptr[libcurl.CURL], cb: Either[Throwable, Unit] => Unit): Unit = {
+    println("addHandle begin")
     val code = libcurl.curl_multi_add_handle(multiHandle, handle)
     if (code.isError)
       throw CurlError.fromMCode(code)
-    callbacks(handle) = cb
+
+    synchronized:
+      if (exception.isDefined)
+        cb(Left(exception.get))
+      else
+        callbacks(handle) = cb
+    println("addHandle end")
   }
 
-  /** Add a curl handle for a transfer that doesn't finish e.g. a websocket transfer
-    * it adds a handle to multi handle, and removes it when it goes out of scope
-    * so no dangling handler will remain in multi handler
-    * callback is called when the transfer is terminated or goes out of scope
-    *
-    * @param handle curl easy handle to add
-    * @param cb callback to run if this handler is terminated unexpectedly
-    */
-  def addHandleR(
-      handle: Ptr[libcurl.CURL],
-      cb: Either[Throwable, Unit] => Unit,
-  ): Resource[IO, Unit] = Resource.make(IO(addHandle(handle, cb)))(_ =>
-    IO(callbacks.remove(handle).foreach(_(Right(()))))
-  )
+  override def cleanUp(): Unit =
+    synchronized:
+      callbacks.foreach { case (handle, cb) =>
+        callbacks.remove(handle)
+        cb(Left(new RuntimeException("CurlExecutorScheduler is shutting down")))
+
+        val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
+        if (code.isError)
+          throw CurlError.fromMCode(code)
+        libcurl.curl_easy_cleanup(handle)
+      }
+
+  // /** Add a curl handle for a transfer that doesn't finish e.g. a websocket transfer
+  //   * it adds a handle to multi handle, and removes it when it goes out of scope
+  //   * so no dangling handler will remain in multi handler
+  //   * callback is called when the transfer is terminated or goes out of scope
+  //   *
+  //   * @param handle curl easy handle to add
+  //   * @param cb callback to run if this handler is terminated unexpectedly
+  //   */
+  // def addHandleR(handle: Ptr[libcurl.CURL], cb: Either[Throwable, Unit] => Unit): Unit =
+  //   Resource.make(IO(addHandle(handle, cb)))(_ =>
+  //   IO(callbacks.remove(handle).foreach(_(Right(()))))
+  // )
 }
 
 private[curl] object CurlExecutorScheduler {
 
-  def apply(pollEvery: Int): (CurlExecutorScheduler, () => Unit) = {
-    val initCode = libcurl.curl_global_init(2)
-    if (initCode.isError)
-      throw CurlError.fromCode(initCode)
+  def getWithCleanUp(
+      multiHandle: Ptr[libcurl.CURLM],
+      pollEvery: Int,
+  ): (CurlExecutorScheduler, () => Unit) = {
+    val scheduler = new CurlExecutorScheduler(multiHandle, pollEvery)
 
-    val multiHandle = libcurl.curl_multi_init()
-    if (multiHandle == null)
-      throw new RuntimeException("curl_multi_init")
+    // It is not a daemon thread,
+    // because we want to wait for it to finish gracefully.
+    val pollerThread = Thread(() => scheduler.loop())
+    pollerThread.start()
 
-    val shutdown = () => {
-      val code = libcurl.curl_multi_cleanup(multiHandle)
-      libcurl.curl_global_cleanup()
-      if (code.isError)
-        throw CurlError.fromMCode(code)
+    val cleanUp = () => {
+      synchronized:
+        scheduler.running = false
+      scheduler.cleanUp()
     }
 
-    (new CurlExecutorScheduler(multiHandle, pollEvery), shutdown)
+    (scheduler, cleanUp)
   }
-
 }

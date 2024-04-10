@@ -16,77 +16,107 @@
 
 package org.http4s.curl.http
 
-import cats.effect._
-import org.http4s.Request
-import org.http4s.Response
 import org.http4s.curl.internal.Utils
 import org.http4s.curl.internal._
-import org.http4s.curl.unsafe.CurlExecutorScheduler
+import org.http4s.curl.internal.CurlEasy
+import org.http4s.curl.unsafe.CurlRuntimeContext
+import org.http4s.curl.http.simple._
+import org.http4s.curl.unsafe.libcurl_const
+import org.http4s.curl.internal.Utils.toPtr
 
-private[curl] object CurlRequest {
+import scala.scalanative.unsafe._
+import gears.async.Async
+import scala.util.Try
+import scala.util.Failure
+import scala.util.Success
+
+object CurlRequest {
   private def setup(
       handle: CurlEasy,
-      ec: CurlExecutorScheduler,
-      send: RequestSend,
-      recv: RequestRecv,
-      req: Request[IO],
-  ): Resource[IO, Unit] =
-    Utils.newZone.flatMap(implicit zone =>
-      CurlSList().evalMap(headers =>
-        IO {
-          // TODO add in options
-          // handle.setVerbose(true)
+      sendData: RequestSend,
+      recvData: RequestRecv,
+      version: String,
+      method: String,
+      headers: CurlSList,
+      uri: String,
+  )(using zone: Zone, cc: CurlRuntimeContext): Unit = {
+    // TODO add in options
+    // handle.setVerbose(true)
 
-          import org.http4s.curl.unsafe.libcurl_const
-          import scala.scalanative.unsafe._
-          import org.http4s.Header
-          import org.http4s.HttpVersion
-          import org.typelevel.ci._
+    handle.setCustomRequest(toCString(method))
 
-          handle.setCustomRequest(toCString(req.method.renderString))
+    handle.setUpload(true)
 
-          handle.setUpload(true)
+    handle.setUrl(toCString(uri))
 
-          handle.setUrl(toCString(req.uri.renderString))
+    val httpVersion = version match {
+      case "1.0" => libcurl_const.CURL_HTTP_VERSION_1_0
+      case "1.1" => libcurl_const.CURL_HTTP_VERSION_1_1
+      case "2" => libcurl_const.CURL_HTTP_VERSION_2
+      case "3" => libcurl_const.CURL_HTTP_VERSION_3
+      case _ => libcurl_const.CURL_HTTP_VERSION_NONE
+    }
+    handle.setHttpVersion(toSize(httpVersion))
 
-          val httpVersion = req.httpVersion match {
-            case HttpVersion.`HTTP/1.0` => libcurl_const.CURL_HTTP_VERSION_1_0
-            case HttpVersion.`HTTP/1.1` => libcurl_const.CURL_HTTP_VERSION_1_1
-            case HttpVersion.`HTTP/2` => libcurl_const.CURL_HTTP_VERSION_2
-            case HttpVersion.`HTTP/3` => libcurl_const.CURL_HTTP_VERSION_3
-            case _ => libcurl_const.CURL_HTTP_VERSION_NONE
-          }
-          handle.setHttpVersion(httpVersion)
+    println("the pointer still is: " + headers.list.toString())
+    handle.setHttpHeader(headers.toPtr)
+    println("the pointer and also still is: " + headers.list.toString())
 
-          req.headers // curl adds these headers automatically, so we explicitly disable them
-            .transform(Header.Raw(ci"Expect", "") :: Header.Raw(ci"Transfer-Encoding", "") :: _)
-            .foreach(header => headers.append(header.toString))
+    handle.setReadData(Utils.toPtr(sendData))
+    handle.setReadFunction(RequestSend.readCallback(_, _, _, _))
 
-          handle.setHttpHeader(headers.toPtr)
+    handle.setHeaderData(Utils.toPtr(recvData))
+    handle.setHeaderFunction(RequestRecv.headerCallback(_, _, _, _))
 
-          handle.setReadData(Utils.toPtr(send))
-          handle.setReadFunction(RequestSend.readCallback(_, _, _, _))
+    handle.setWriteData(Utils.toPtr(recvData))
+    handle.setWriteFunction(RequestRecv.writeCallback(_, _, _, _))
 
-          handle.setHeaderData(Utils.toPtr(recv))
-          handle.setHeaderFunction(RequestRecv.headerCallback(_, _, _, _))
+    cc.addHandle(handle.curl, recvData.onTerminated)
+  }
 
-          handle.setWriteData(Utils.toPtr(recv))
-          handle.setWriteFunction(RequestRecv.writeCallback(_, _, _, _))
-
-          ec.addHandle(handle.curl, recv.onTerminated)
-        }
-      )
-    )
-
-  def apply(ec: CurlExecutorScheduler, req: Request[IO]): Resource[IO, Response[IO]] = for {
-    gc <- GCRoot()
-    handle <- CurlEasy()
-    flow <- FlowControl(handle)
-    send <- RequestSend(flow)
-    recv <- RequestRecv(flow)
-    _ <- gc.add(send, recv)
-    _ <- setup(handle, ec, send, recv, req)
-    _ <- req.body.through(send.pipe).compile.drain.background
-    resp <- recv.response()
-  } yield resp
+  def apply(req: SimpleRequest)(using CurlRuntimeContext)(using Async): Try[SimpleResponse] =
+    // gc <- GCRoot()
+    println("apply begin")
+    var r = try {
+      CurlEasy.withEasy { handle =>
+        val sendData = RequestSend(req.body)
+        val recvData = RequestRecv()
+        given zone: Zone = Zone.open()
+        println("before CurlSList.withSList")
+        val rr = try {
+          CurlSList.withSList(headers =>
+            println("the slist pointer beginning with slist" + toPtr(headers).toString())
+            println("inside begin CurlSList.withSList")
+            req.headers.foreach(headers.append(_))
+            setup(
+              handle,
+              sendData,
+              recvData,
+              req.httpVersion.toString,
+              req.method.toString,
+              headers,
+              req.uri,
+            )
+            // somehow send the body
+            val rrr = recvData.response()
+            println("the slist pointer after response in with slist" + toPtr(headers).toString())
+            println("the slist pointer" + toPtr(headers).toString())
+            println("theeeeeee pppppointer and also still is: " + headers.list.toString())
+            rrr
+          )
+        } finally zone.close()
+        println("after CurlSList.withSList")
+        rr
+      }
+    } catch {
+      case e: Exception => Failure(e)
+    }
+    println("apply end")
+    r
+    // flow <- FlowControl(handle)
+    // _ <- gc.add(send, recv)
+    // _ <- setup(handle, ec, send, recv, req)
+    // _ <- req.body.through(send.pipe).compile.drain.background
+    // resp <- recv.response()
+  // yield resp
 }

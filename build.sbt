@@ -1,4 +1,5 @@
 import Versions._
+import scalanative.build._
 
 ThisBuild / tlBaseVersion := "0.2"
 
@@ -22,6 +23,10 @@ ThisBuild / nativeConfig ~= { c =>
   } else c
 
   platformOptions
+    .withMultithreadingSupport(true)
+    .withLTO(LTO.none)
+    .withMode(Mode.debug)
+    .withGC(GC.immix)
 }
 
 ThisBuild / envVars ++= {
@@ -53,8 +58,9 @@ lazy val curl = project
   .settings(
     name := "http4s-curl",
     libraryDependencies ++= Seq(
-      "org.typelevel" %%% "cats-effect" % catsEffectVersion,
-      "org.http4s" %%% "http4s-client" % http4sVersion,
+      "ch.epfl.lamp" %%% "gears" % gearsVersion
+      // "org.typelevel" %%% "cats-effect" % catsEffectVersion,
+      // "org.http4s" %%% "http4s-client" % http4sVersion,
     ),
   )
 
@@ -64,7 +70,8 @@ lazy val example = project
   .dependsOn(curl)
   .settings(
     libraryDependencies ++= Seq(
-      "org.http4s" %%% "http4s-circe" % http4sVersion
+      "ch.epfl.lamp" %%% "gears" % gearsVersion
+      // "org.http4s" %%% "http4s-circe" % http4sVersion
     )
   )
 
@@ -73,8 +80,7 @@ lazy val testServer = project
   .enablePlugins(NoPublishPlugin)
   .settings(
     libraryDependencies ++= Seq(
-      // "org.typelevel" %% "cats-effect" % catsEffectVersion,
-      "ch.epfl.lamp" %%% "gears" % gearsVersion,
+      "org.typelevel" %% "cats-effect" % catsEffectVersion,
       "org.http4s" %% "http4s-dsl" % http4sVersion,
       "org.http4s" %% "http4s-ember-server" % http4sVersion,
       "ch.qos.logback" % "logback-classic" % "1.4.14",
@@ -91,15 +97,26 @@ lazy val testCommon = project
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
   .dependsOn(curl)
   .settings(
+    testFrameworks += new TestFramework("munit.Framework"),
     libraryDependencies ++= Seq(
-      "org.typelevel" %%% "munit-cats-effect" % munitCEVersion
-    )
+      "ch.epfl.lamp" %%% "gears" % gearsVersion,
+      "org.scalameta" %%% "munit" % "1.0.0-M10+17-0ca7e7e9-SNAPSHOT" % Test,
+      // "org.typelevel" %%% "munit-cats-effect" % munitCEVersion
+    ),
   )
 
 lazy val httpTestSuite = project
   .in(file("tests/http"))
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
   .dependsOn(testCommon)
+  .settings(
+    testFrameworks += new TestFramework("munit.Framework"),
+    libraryDependencies ++= Seq(
+      "ch.epfl.lamp" %%% "gears" % gearsVersion,
+      "org.scalameta" %%% "munit" % "1.0.0-M10+17-0ca7e7e9-SNAPSHOT" % Test,
+      // "org.typelevel" %%% "munit-cats-effect" % munitCEVersion
+    ),
+  )
 
 lazy val websocketTestSuite = project
   .in(file("tests/websocket"))

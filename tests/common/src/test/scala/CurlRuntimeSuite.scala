@@ -23,18 +23,20 @@ class CurlRuntimeSuite extends FunSuite {
 
   test("curl version") {
     val prefixPattern = """^libcurl\/[78]\..+$""".r
-    assert(prefixPattern.matches(CurlRuntime.curlVersion))
+    assert(prefixPattern.matches(MyCurlRuntime.curlVersion))
   }
 
   test("curl version number") {
-    assert(CurlRuntime.curlVersionNumber > 0x070000)
-    assert(CurlRuntime.curlVersionTriple._1 >= 7)
+    assert(MyCurlRuntime.curlVersionNumber > 0x070000)
+    assert(MyCurlRuntime.curlVersionTriple._1 >= 7)
   }
 
   test("curl protocols") {
-    val protocols = CurlRuntime.protocols
+    val protocols = MyCurlRuntime.protocols
     assert(protocols.contains("http"))
     assert(protocols.contains("https"))
   }
 
 }
+
+object MyCurlRuntime extends CurlRuntime

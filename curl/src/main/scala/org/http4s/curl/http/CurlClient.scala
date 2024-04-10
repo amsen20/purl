@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-package org.http4s.curl.http
+// package org.http4s.curl.http
 
-import cats.effect._
-import org.http4s.client.Client
-import org.http4s.curl.unsafe.CurlExecutorScheduler
+// import org.http4s.curl.unsafe.CurlRuntime
 
-private[curl] object CurlClient {
-  def apply(ec: CurlExecutorScheduler): Client[IO] = Client(CurlRequest(ec, _))
+// private[curl] object CurlClient {
+//   def apply(using CurlRuntime.Context): Unit = 
+//     Client(CurlRequest(ec, _))
 
-  def get: IO[Client[IO]] = IO.executionContext.flatMap {
-    case ec: CurlExecutorScheduler => IO.pure(apply(ec))
-    case _ => IO.raiseError(new RuntimeException("Not running on CurlExecutorScheduler"))
-  }
-}
+//   // def get: IO[Client[IO]] = IO.executionContext.flatMap {
+//   //   case ec: CurlExecutorScheduler => IO.pure(apply(ec))
+//   //   case _ => IO.raiseError(new RuntimeException("Not running on CurlExecutorScheduler"))
+//   // }
+// }

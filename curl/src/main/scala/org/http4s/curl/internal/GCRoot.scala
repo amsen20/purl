@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-package org.http4s.curl.internal
+// package org.http4s.curl.internal
 
-import cats.effect._
+// import cats.effect._
 
-/** Helper to keep references of objects in memory explicitly
-  * When you want to make sure that GC won't clean them up until
-  * this GCRoot is alive
-  */
-final private[curl] class GCRoot private (private val root: Ref[IO, Set[Any]]) extends AnyVal {
-  @inline def add(objs: Any*): Resource[IO, Unit] = Resource.eval(root.update(_ ++ objs))
-}
+// /** Helper to keep references of objects in memory explicitly
+//   * When you want to make sure that GC won't clean them up until
+//   * this GCRoot is alive
+//   */
+// final private[curl] class GCRoot private (private val root: Ref[IO, Set[Any]]) extends AnyVal {
+//   @inline def add(objs: Any*): Resource[IO, Unit] = Resource.eval(root.update(_ ++ objs))
+// }
 
-private[curl] object GCRoot {
-  def apply(): Resource[IO, GCRoot] = Resource
-    .make(IO.ref(Set.empty[Any]))(_.set(Set.empty))
-    .map(new GCRoot(_))
-}
+// private[curl] object GCRoot {
+//   def apply(): Resource[IO, GCRoot] = Resource
+//     .make(IO.ref(Set.empty[Any]))(_.set(Set.empty))
+//     .map(new GCRoot(_))
+// }

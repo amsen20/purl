@@ -16,20 +16,44 @@
 
 package org.http4s.curl.internal
 
-import cats.effect.IO
-import cats.effect.Resource
 import org.http4s.curl.unsafe.libcurl._
 
 import scala.scalanative.unsafe._
+import scala.util.Failure
+import scala.util.Success
+import scala.scalanative.runtime.RawPtr
+import org.http4s.curl.internal.Utils.toPtr
 
-final private[curl] class CurlSList private (private var list: Ptr[curl_slist])(implicit
+final private[curl] class CurlSList(private[curl] var list: Ptr[curl_slist])(using
     zone: Zone
 ) {
-  @inline def append(str: String): Unit = list = curl_slist_append(list, toCString(str))
+  @inline def append(str: String): Unit =
+    println("appppppppeeennnddd called")
+    list = curl_slist_append(list, toCString(str))
   @inline val toPtr = list
+
+  override def toString(): String = "hi"
 }
 
 private[curl] object CurlSList {
-  def apply()(implicit zone: Zone): Resource[IO, CurlSList] =
-    Resource.make(IO(new CurlSList(list = null)))(slist => IO(curl_slist_free_all(slist.list)))
+  def withSList[T](body: CurlSList => T)(using zone: Zone): T =
+    var slist: CurlSList = null
+    try {
+      slist = CurlSList(list = null)
+      slist.append("Content-Type: application/json")
+      println("the pointer is: " + slist.list.toString())
+      println("the slist pointer before body" + toPtr(slist).toString())
+      val r = body(slist)
+      println("the slist pointer after body" + toPtr(slist).toString())
+      println("theeeeeeeeee pointer is: " + slist.list.toString())
+      r
+    } finally {
+      println("freeing the the slist")
+      println("some thing else")
+      println("the object is: " + slist.toString())
+      println("the pointer is null: " + (slist.list == null))
+      println("the pointer is: " + slist.list.toString())
+      if slist != null && slist.list != null then curl_slist_free_all(slist.list)
+      // println("done freeing the slist")
+    }
 }
