@@ -1,19 +1,3 @@
-/*
- * Copyright 2022 http4s.org
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.http4s.curl.internal
 
 import org.http4s.curl.CurlError
@@ -98,6 +82,12 @@ final private[curl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[
   def pause(bitmask: CInt): Unit = throwOnError(curl_easy_pause(curl, bitmask))
 }
 
+/**
+  * An structured style of using curl_easy handle.
+  * The handle can be used as the argument of the body function.
+  * It is non-blocking but synchronous.
+  * For having it async, you can wrap it in a Future.
+  */
 private[curl] object CurlEasy {
   final private val CURL_ERROR_SIZE = 256L
 
@@ -107,18 +97,16 @@ private[curl] object CurlEasy {
     val handle: Ptr[CURL] = curl_easy_init()
     if (handle == null)
       throw new RuntimeException("curl_easy_init")
-    
+
     val zone: Zone = Zone.open()
     try {
       val buf = zone.alloc(CURL_ERROR_SIZE.toULong)
-      
+
       val code = curl_easy_setopt_errorbuffer(handle, CURLOPT_ERRORBUFFER, buf)
       if (code.isError) {
         throw CurlError.fromCode(code)
       }
 
       body(CurlEasy(handle, buf))
-    } finally {
-      zone.close()
-    }
+    } finally zone.close()
 }
