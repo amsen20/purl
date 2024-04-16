@@ -1,19 +1,3 @@
-/*
- * Copyright 2022 http4s.org
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.http4s.curl.http
 
 import org.http4s.curl.internal.Utils
@@ -39,10 +23,8 @@ object CurlRequest {
       method: String,
       headers: CurlSList,
       uri: String,
-  )(using zone: Zone, cc: CurlRuntimeContext): Unit = {
-    // TODO add in options
+  )(using cc: CurlRuntimeContext, zone: Zone): Unit = {
     // handle.setVerbose(true)
-
     handle.setCustomRequest(toCString(method))
 
     handle.setUpload(true)
@@ -58,9 +40,7 @@ object CurlRequest {
     }
     handle.setHttpVersion(toSize(httpVersion))
 
-    println("the pointer still is: " + headers.list.toString())
-    handle.setHttpHeader(headers.toPtr)
-    println("the pointer and also still is: " + headers.list.toString())
+    handle.setHttpHeader(headers.list)
 
     handle.setReadData(Utils.toPtr(sendData))
     handle.setReadFunction(RequestSend.readCallback(_, _, _, _))
@@ -75,18 +55,12 @@ object CurlRequest {
   }
 
   def apply(req: SimpleRequest)(using CurlRuntimeContext)(using Async): Try[SimpleResponse] =
-    // gc <- GCRoot()
-    println("apply begin")
-    var r = try {
+    try
       CurlEasy.withEasy { handle =>
         val sendData = RequestSend(req.body)
         val recvData = RequestRecv()
-        given zone: Zone = Zone.open()
-        println("before CurlSList.withSList")
-        val rr = try {
+        Zone:
           CurlSList.withSList(headers =>
-            println("the slist pointer beginning with slist" + toPtr(headers).toString())
-            println("inside begin CurlSList.withSList")
             req.headers.foreach(headers.append(_))
             setup(
               handle,
@@ -97,26 +71,10 @@ object CurlRequest {
               headers,
               req.uri,
             )
-            // somehow send the body
-            val rrr = recvData.response()
-            println("the slist pointer after response in with slist" + toPtr(headers).toString())
-            println("the slist pointer" + toPtr(headers).toString())
-            println("theeeeeee pppppointer and also still is: " + headers.list.toString())
-            rrr
+            recvData.response()
           )
-        } finally zone.close()
-        println("after CurlSList.withSList")
-        rr
       }
-    } catch {
-      case e: Exception => Failure(e)
+    catch {
+      case e: Throwable => Failure(e)
     }
-    println("apply end")
-    r
-    // flow <- FlowControl(handle)
-    // _ <- gc.add(send, recv)
-    // _ <- setup(handle, ec, send, recv, req)
-    // _ <- req.body.through(send.pipe).compile.drain.background
-    // resp <- recv.response()
-  // yield resp
 }
