@@ -6,12 +6,11 @@ import scala.concurrent.ExecutionContext
 import scala.scalanative.unsafe._
 import org.http4s.curl.unsafe.libcurl.CURLM
 
-/**
-  * The runtime context for the curl multi interface
+/** The runtime context for the curl multi interface
   * It allows to run multiple easy handles non-blocking and concurrently.
   * When the runtime is finished, all the easy handles are closed as well.
   */
-private[curl] object CurlMultiRuntime extends CurlRuntime {
+object CurlMultiRuntime extends CurlRuntime {
 
   def apply[T](body: CurlRuntimeContext ?=> T) =
     var multiHandle: Ptr[CURLM] = null

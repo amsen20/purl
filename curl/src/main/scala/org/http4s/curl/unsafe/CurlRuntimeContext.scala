@@ -3,7 +3,7 @@ package unsafe
 
 import scala.scalanative.unsafe.Ptr
 
-abstract private[curl] class CurlRuntimeContext {
+abstract class CurlRuntimeContext {
 
   /** Add a handle to the runtime context
     *

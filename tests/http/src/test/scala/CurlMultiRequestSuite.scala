@@ -1,19 +1,3 @@
-/*
- * Copyright 2022 http4s.org
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.http4s.curl
 
 import org.http4s.curl.http.CurlRequest
@@ -37,29 +21,26 @@ class CurlMultiRequestSuite extends munit.FunSuite {
   given ExecutionContext = ExecutionContext.global
 
   def postRequest(msg: String)(using Async)(using CurlRuntimeContext) =
-    println("sending the post request")
     CurlRequest(
       SimpleRequest(
         HttpVersion.V1_0,
         HttpMethod.POST,
         List(),
         "http://localhost:8080/http/echo",
-        msg,
+        msg.getBytes(),
       )
     ) match
-      case Success(response) => assertEquals(response.body, msg)
+      case Success(response) => assertEquals(response.body.map(_.toChar).mkString, msg)
       case Failure(exception) => fail("couldn't get the response", exception)
-    println("end sending the post request")
 
   def getRequest()(using Async)(using CurlRuntimeContext) =
-    println("sending the get request")
     val res = CurlRequest(
       SimpleRequest(
         HttpVersion.V1_0,
         HttpMethod.GET,
         List(),
         "http://localhost:8080/http",
-        "",
+        "".getBytes(),
       )
     ) match
       case Success(response) =>
@@ -67,25 +48,25 @@ class CurlMultiRequestSuite extends munit.FunSuite {
         response.body
       case Failure(exception) =>
         fail("couldn't get the response", exception)
-    println("end sending the get request")
-    res
-  
+    res.map(_.toChar).mkString
+
   def request()(using Async)(using CurlRuntimeContext) =
     postRequest(getRequest())
-  
+
   def getTime[T](body: () => T) =
     val time = System.currentTimeMillis()
     body()
-    (System.currentTimeMillis() - time)
+    System.currentTimeMillis() - time
 
-
-  test("simple get request") {
+  test("async and sync comparison") {
     CurlMultiRuntime:
       Async.blocking:
-        val elems = (0 to 0)
+        val n = 3
+        val elems = 0 to n - 1
         // Sync
-        // println("Sync time: " + getTime(() => elems.map(_ => request())))
+        val syncTime = getTime(() => elems.map(_ => request()))
         // Async
-        println("Async time: " + getTime(() => elems.map(_ => Future(request())).awaitAll))
+        val asyncTime = getTime(() => elems.map(_ => Future(request())).awaitAll)
+        assert(syncTime > asyncTime * (n - 1))
   }
 }
