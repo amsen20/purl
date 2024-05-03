@@ -4,29 +4,38 @@ import scalanative.build._
 ThisBuild / tlBaseVersion := "0.2"
 
 ThisBuild / developers := List(
-  tlGitHubDev("armanbilge", "Arman Bilge")
+  tlGitHubDev("amsen20", "Amirhossein Pashaeehir")
 )
-ThisBuild / startYear := Some(2022)
+ThisBuild / startYear := Some(2024)
 
 ThisBuild / crossScalaVersions := Seq(scala3)
 
 val vcpkgBaseDir = "C:/vcpkg/"
+val isDebug = false
+
 ThisBuild / nativeConfig ~= { c =>
   val osNameOpt = sys.props.get("os.name")
   val isMacOs = osNameOpt.exists(_.toLowerCase().contains("mac"))
   val isWindows = osNameOpt.exists(_.toLowerCase().contains("windows"))
-  val platformOptions = if (isMacOs) { // brew-installed curl
+  var platformOptions = if (isMacOs) { // brew-installed curl
     c.withLinkingOptions(c.linkingOptions :+ "-L/usr/local/opt/curl/lib")
   } else if (isWindows) { // vcpkg-installed curl
     c.withCompileOptions(c.compileOptions :+ s"-I${vcpkgBaseDir}/installed/x64-windows/include/")
       .withLinkingOptions(c.linkingOptions :+ s"-L${vcpkgBaseDir}/installed/x64-windows/lib/")
   } else c
 
-  platformOptions
-    .withMultithreadingSupport(true)
+  platformOptions = platformOptions
+    .withMultithreading(true)
     .withLTO(LTO.none)
     .withMode(Mode.debug)
     .withGC(GC.immix)
+  if (isDebug)
+    platformOptions
+      .withSourceLevelDebuggingConfig(_.enableAll) // enable generation of debug informations
+      .withOptimize(false) // disable Scala Native optimizer
+      .withMode(scalanative.build.Mode.debug) // compile using LLVM without optimizations
+      .withCompileOptions(Seq("-DSCALANATIVE_DELIMCC_DEBUG"))
+  else platformOptions
 }
 
 ThisBuild / envVars ++= {
@@ -45,7 +54,9 @@ lazy val modules = List(
   testServer,
   testCommon,
   httpTestSuite,
-) ++ when(sys.env.get("EXPERIMENTAL").contains("yes"))(websocketTestSuite)
+) 
+// For now we do not support websocket on Scala Native
+// ++ when(sys.env.get("EXPERIMENTAL").contains("yes"))(websocketTestSuite)
 
 lazy val root =
   tlCrossRootProject
@@ -59,8 +70,6 @@ lazy val curl = project
     name := "http4s-curl",
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion
-      // "org.typelevel" %%% "cats-effect" % catsEffectVersion,
-      // "org.http4s" %%% "http4s-client" % http4sVersion,
     ),
   )
 
@@ -71,7 +80,6 @@ lazy val example = project
   .settings(
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion
-      // "org.http4s" %%% "http4s-circe" % http4sVersion
     )
   )
 
@@ -97,12 +105,11 @@ lazy val testCommon = project
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
   .dependsOn(curl)
   .settings(
-    testFrameworks += new TestFramework("munit.Framework"),
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion,
-      "org.scalameta" %%% "munit" % "1.0.0-M10+17-0ca7e7e9-SNAPSHOT" % Test,
-      // "org.typelevel" %%% "munit-cats-effect" % munitCEVersion
+      "org.scalameta" %%% "munit" % "1.0.0-M10+17-0ca7e7e9+20240412-1159-SNAPSHOT" % Test,
     ),
+    testFrameworks += new TestFramework("munit.Framework"),
   )
 
 lazy val httpTestSuite = project
@@ -110,12 +117,11 @@ lazy val httpTestSuite = project
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
   .dependsOn(testCommon)
   .settings(
-    testFrameworks += new TestFramework("munit.Framework"),
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion,
-      "org.scalameta" %%% "munit" % "1.0.0-M10+17-0ca7e7e9-SNAPSHOT" % Test,
-      // "org.typelevel" %%% "munit-cats-effect" % munitCEVersion
+      "org.scalameta" %%% "munit" % "1.0.0-M10+17-0ca7e7e9+20240412-1159-SNAPSHOT" % Test,
     ),
+    testFrameworks += new TestFramework("munit.Framework"),
   )
 
 lazy val websocketTestSuite = project
