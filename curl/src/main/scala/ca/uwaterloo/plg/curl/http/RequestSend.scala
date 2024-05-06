@@ -1,7 +1,8 @@
-package org.http4s.curl.http
+package ca.uwaterloo.plg.curl
+package http
 
-import org.http4s.curl.internal.Utils
-import org.http4s.curl.unsafe.libcurl_const
+import ca.uwaterloo.plg.curl.internal.Utils
+import ca.uwaterloo.plg.curl.unsafe.libcurl_const
 
 import scalanative.unsafe._
 import scalanative.libc.string._

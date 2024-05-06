@@ -1,4 +1,4 @@
-package org.http4s.curl
+package ca.uwaterloo.plg.curl
 
 import scala.scalanative.unsafe.fromCString
 

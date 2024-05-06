@@ -1,4 +1,5 @@
-package org.http4s.curl.http.simple
+package ca.uwaterloo.plg.curl.http
+package simple
 
 enum HttpVersion(raw: String):
   case V1_0 extends HttpVersion("HTTP/1.0")

@@ -1,9 +1,10 @@
-package org.http4s.curl.internal
+package ca.uwaterloo.plg.curl
+package internal
 
-import org.http4s.curl.CurlError
-import org.http4s.curl.unsafe.CurlRuntimeContext
-import org.http4s.curl.unsafe.libcurl._
-import org.http4s.curl.unsafe.libcurl_const._
+import ca.uwaterloo.plg.curl.CurlError
+import ca.uwaterloo.plg.curl.unsafe.CurlRuntimeContext
+import ca.uwaterloo.plg.curl.unsafe.libcurl._
+import ca.uwaterloo.plg.curl.unsafe.libcurl_const._
 
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._

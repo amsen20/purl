@@ -1,4 +1,5 @@
-package org.http4s.curl.internal
+package ca.uwaterloo.plg.curl
+package internal
 
 import scala.scalanative.runtime
 import scala.scalanative.runtime.Intrinsics

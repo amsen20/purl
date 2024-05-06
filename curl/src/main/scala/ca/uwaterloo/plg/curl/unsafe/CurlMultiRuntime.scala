@@ -1,10 +1,11 @@
-package org.http4s.curl
+package ca.uwaterloo.plg.curl
 package unsafe
+
+import ca.uwaterloo.plg.curl.unsafe.libcurl.CURLM
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.scalanative.unsafe._
-import org.http4s.curl.unsafe.libcurl.CURLM
 
 /** The runtime context for the curl multi interface
   * It allows to run multiple easy handles non-blocking and concurrently.

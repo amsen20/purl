@@ -1,10 +1,9 @@
-package org.http4s.curl
+package ca.uwaterloo.plg.curl
 
-import org.http4s.curl.http.CurlRequest
-import org.http4s.curl.unsafe.CurlMultiRuntime
-import org.http4s.curl.http.simple.SimpleRequest
-import org.http4s.curl.http.simple.HttpVersion
-import org.http4s.curl.http.simple.HttpMethod
+import ca.uwaterloo.plg.curl.http.simple.{HttpMethod, HttpVersion, SimpleRequest}
+import ca.uwaterloo.plg.curl.http.CurlRequest
+import ca.uwaterloo.plg.curl.unsafe.CurlMultiRuntime
+import ca.uwaterloo.plg.curl.CurlError
 
 import scala.util.Success
 import gears.async.default.given

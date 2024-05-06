@@ -1,12 +1,13 @@
-package org.http4s.curl.internal
+package ca.uwaterloo.plg.curl
+package internal
 
-import org.http4s.curl.unsafe.libcurl._
+import ca.uwaterloo.plg.curl.unsafe.libcurl._
+import ca.uwaterloo.plg.curl.internal.Utils.toPtr
 
 import scala.scalanative.unsafe._
 import scala.util.Failure
 import scala.util.Success
 import scala.scalanative.runtime.RawPtr
-import org.http4s.curl.internal.Utils.toPtr
 import collection.mutable
 
 final private[curl] class CurlSList(private[curl] var list: Ptr[curl_slist]) {

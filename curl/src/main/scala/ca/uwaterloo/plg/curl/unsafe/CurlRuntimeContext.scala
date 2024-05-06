@@ -1,4 +1,4 @@
-package org.http4s.curl
+package ca.uwaterloo.plg.curl
 package unsafe
 
 import scala.scalanative.unsafe.Ptr

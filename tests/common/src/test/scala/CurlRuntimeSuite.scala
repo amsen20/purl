@@ -1,7 +1,7 @@
-package org.http4s.curl
+package ca.uwaterloo.plg.curl
 
 import munit.FunSuite
-import org.http4s.curl.unsafe.CurlRuntime
+import ca.uwaterloo.plg.curl.unsafe.CurlRuntime
 
 class CurlRuntimeSuite extends FunSuite {
 

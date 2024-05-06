@@ -1,12 +1,10 @@
-package org.http4s.curl.http
+package ca.uwaterloo.plg.curl
+package http
 
-import org.http4s.curl.internal.Utils
-import org.http4s.curl.internal._
-import org.http4s.curl.internal.CurlEasy
-import org.http4s.curl.unsafe.CurlRuntimeContext
-import org.http4s.curl.http.simple._
-import org.http4s.curl.unsafe.libcurl_const
-import org.http4s.curl.internal.Utils.toPtr
+import ca.uwaterloo.plg.curl.internal._
+import ca.uwaterloo.plg.curl.unsafe.CurlRuntimeContext
+import ca.uwaterloo.plg.curl.http.simple._
+import ca.uwaterloo.plg.curl.unsafe.libcurl_const
 
 import scala.scalanative.unsafe._
 import gears.async.Async

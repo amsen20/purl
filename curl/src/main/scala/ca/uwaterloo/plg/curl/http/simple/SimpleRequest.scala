@@ -1,4 +1,5 @@
-package org.http4s.curl.http.simple
+package ca.uwaterloo.plg.curl.http
+package simple
 
 case class SimpleRequest(
     httpVersion: HttpVersion,

@@ -1,19 +1,15 @@
-package org.http4s.curl
+package ca.uwaterloo.plg.curl
 
-import org.http4s.curl.http.CurlRequest
-import org.http4s.curl.unsafe.CurlMultiRuntime
-import org.http4s.curl.http.simple.SimpleRequest
-import org.http4s.curl.http.simple.HttpVersion
-import org.http4s.curl.http.simple.HttpMethod
+import ca.uwaterloo.plg.curl.http.simple.{HttpMethod, HttpVersion, SimpleRequest, SimpleResponse}
+import ca.uwaterloo.plg.curl.http.CurlRequest
+import ca.uwaterloo.plg.curl.unsafe.{CurlMultiRuntime, CurlRuntimeContext}
 
 import scala.util.Success
 import gears.async.default.given
 import scala.concurrent.ExecutionContext
 import gears.async.*
 import scala.util.Failure
-import org.http4s.curl.unsafe.CurlRuntimeContext
 import scala.util.Try
-import org.http4s.curl.http.simple.SimpleResponse
 import scala.annotation.static
 
 class CurlMultiRequestSuite extends munit.FunSuite {

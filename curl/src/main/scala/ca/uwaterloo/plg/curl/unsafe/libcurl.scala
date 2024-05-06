@@ -1,4 +1,5 @@
-package org.http4s.curl.unsafe
+package ca.uwaterloo.plg.curl
+package unsafe
 
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
@@ -74,10 +75,10 @@ final private[curl] case class CURLMcode(value: CInt) extends AnyVal {
 private[curl] object libcurl {
 
   type CURL
-  type CURLcode = org.http4s.curl.unsafe.CURLcode
+  type CURLcode = ca.uwaterloo.plg.curl.unsafe.CURLcode
 
   type CURLM
-  type CURLMcode = org.http4s.curl.unsafe.CURLMcode
+  type CURLMcode = ca.uwaterloo.plg.curl.unsafe.CURLMcode
 
   type CURLMSG = CUnsignedInt
   type CURLMsg

@@ -1,6 +1,7 @@
-package org.http4s.curl.unsafe
+package ca.uwaterloo.plg.curl
+package unsafe
 
-import org.http4s.curl.CurlError
+import ca.uwaterloo.plg.curl.CurlError
 
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
@@ -64,7 +65,7 @@ final private[curl] class CurlMultiScheduler(multiHandle: Ptr[libcurl.CURLM], po
         )
 
         if (pollCode.isError)
-          throw CurlError.fromMCode(pollCode) // FIXME what to do here?
+          throw CurlError.fromMCode(pollCode)
       }
 
       if (noCallbacks) false

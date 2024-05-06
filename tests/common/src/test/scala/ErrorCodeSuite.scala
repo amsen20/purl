@@ -1,7 +1,8 @@
-package org.http4s.curl
+package ca.uwaterloo.plg.curl
 
 import munit.FunSuite
-import org.http4s.curl.unsafe.CURLcode
+import ca.uwaterloo.plg.curl.unsafe.CURLcode
+import ca.uwaterloo.plg.curl.CurlError
 
 class ErrorCodeSuite extends FunSuite {
   test("sanity") {
