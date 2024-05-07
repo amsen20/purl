@@ -1,7 +1,7 @@
 # gurl
 
 ## Introduction
-A *HTTP* client on [Scala Native](https://github.com/scala-native/scala-native/), backed by [libcurl](https://curl.se/libcurl/). Check out the a simple [web crawler](https://github.com/amsen20/gurl/blob/direct_scala/example/src/main/scala/Main.scala).
+A *HTTP* client on [Scala Native](https://github.com/scala-native/scala-native/), backed by [libcurl](https://curl.se/libcurl/). Check out a simple [web crawler](https://github.com/amsen20/gurl/blob/direct_scala/example/src/main/scala/Main.scala).
 
 - Non-blocking, with support for running multiple concurrent requests in parallel
 - Multi-threaded, Can be used by wrapping the requests in any [gears](https://github.com/lampepfl/gears) Source types (like Future) and can be executed in multiple threads
