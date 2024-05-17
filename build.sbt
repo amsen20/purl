@@ -1,7 +1,8 @@
 import Versions._
 import scalanative.build._
 
-ThisBuild / tlBaseVersion := "0.2"
+ThisBuild / tlBaseVersion := "0.1"
+ThisBuild / organization := "ca.uwaterloo.plg"
 
 ThisBuild / developers := List(
   tlGitHubDev("amsen20", "Amirhossein Pashaeehir")
@@ -67,7 +68,7 @@ lazy val curl = project
   .in(file("curl"))
   .enablePlugins(ScalaNativePlugin)
   .settings(
-    name := "http4s-curl",
+    name := "gurl",
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion
     ),
@@ -107,7 +108,7 @@ lazy val testCommon = project
   .settings(
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion,
-      "org.scalameta" %%% "munit" % "1.0.0-M10+17-0ca7e7e9+20240412-1159-SNAPSHOT" % Test,
+      "org.scalameta" %%% "munit" % munitVersion % Test,
     ),
     testFrameworks += new TestFramework("munit.Framework"),
   )
@@ -119,7 +120,7 @@ lazy val httpTestSuite = project
   .settings(
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion,
-      "org.scalameta" %%% "munit" % "1.0.0-M10+17-0ca7e7e9+20240412-1159-SNAPSHOT" % Test,
+      "org.scalameta" %%% "munit" % munitVersion % Test,
     ),
     testFrameworks += new TestFramework("munit.Framework"),
   )
