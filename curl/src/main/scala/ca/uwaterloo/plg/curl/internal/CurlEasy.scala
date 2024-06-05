@@ -70,6 +70,9 @@ final private[curl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[
       flags: CLong
   ): Unit = throwOnError(curl_easy_setopt_websocket(curl, CURLOPT_WS_OPTIONS, flags))
 
+  def setNoSignal(value: Boolean): Unit =
+    throwOnError(curl_easy_setopt_no_signal(curl, CURLOPT_NOSIGNAL, if (value) 1 else 0))
+
   def wsSend(
       buffer: Ptr[Byte],
       bufLen: CSize,
