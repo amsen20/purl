@@ -27,6 +27,8 @@ object CurlRequest {
 
     handle.setUpload(true)
 
+    handle.setNoSignal(true)
+
     handle.setUrl(toCString(uri))
 
     val httpVersion = version match {
@@ -49,6 +51,8 @@ object CurlRequest {
     handle.setWriteData(Utils.toPtr(recvData))
     handle.setWriteFunction(RequestRecv.writeCallback(_, _, _, _))
 
+    cc.keepTrack(sendData)
+    cc.keepTrack(recvData)
     cc.addHandle(handle.curl, recvData.onTerminated)
   }
 
