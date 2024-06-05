@@ -17,7 +17,7 @@ class CurlRequestSuite extends munit.FunSuite {
 
   test("simple get request") {
     Async.blocking:
-      CurlMultiRuntime:
+      CurlMultiRuntime(Int.MaxValue, Int.MaxValue):
         CurlRequest(
           SimpleRequest(
             HttpVersion.V1_0,
@@ -35,7 +35,7 @@ class CurlRequestSuite extends munit.FunSuite {
 
   test("status code") {
     Async.blocking:
-      CurlMultiRuntime:
+      CurlMultiRuntime(Int.MaxValue, Int.MaxValue):
         for statusCode <- List(404, 500) do
           CurlRequest(
             SimpleRequest(
@@ -54,7 +54,7 @@ class CurlRequestSuite extends munit.FunSuite {
 
   test("error") {
     Async.blocking:
-      CurlMultiRuntime:
+      CurlMultiRuntime(Int.MaxValue, Int.MaxValue):
         CurlRequest(
           SimpleRequest(
             HttpVersion.V1_0,
@@ -73,7 +73,7 @@ class CurlRequestSuite extends munit.FunSuite {
 
   test("post echo") {
     Async.blocking:
-      CurlMultiRuntime:
+      CurlMultiRuntime(Int.MaxValue, Int.MaxValue):
         for msg <- List("a") do
           println("Current time: " + System.currentTimeMillis())
           CurlRequest(

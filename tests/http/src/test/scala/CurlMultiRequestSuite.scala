@@ -55,7 +55,7 @@ class CurlMultiRequestSuite extends munit.FunSuite {
     System.currentTimeMillis() - time
 
   test("async and sync comparison") {
-    CurlMultiRuntime:
+    CurlMultiRuntime(Int.MaxValue, Int.MaxValue):
       Async.blocking:
         val n = 3
         val elems = 0 to n - 1
