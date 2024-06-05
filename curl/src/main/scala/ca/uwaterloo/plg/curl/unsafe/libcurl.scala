@@ -28,6 +28,7 @@ private[curl] object libcurl_const {
   final val CURLOPT_VERBOSE = CURLOPTTYPE_LONG + 41
   final val CURLOPT_UPLOAD = CURLOPTTYPE_LONG + 46
   final val CURLOPT_WS_OPTIONS = CURLOPTTYPE_LONG + 320
+  final val CURLOPT_NOSIGNAL = CURLOPTTYPE_LONG + 99
 
   final val CURL_HTTP_VERSION_NONE = 0L
   final val CURL_HTTP_VERSION_1_0 = 1L
@@ -118,6 +119,8 @@ private[curl] object libcurl {
       timeout_ms: CInt,
       numfds: Ptr[CInt],
   ): CURLMcode = extern
+
+  def curl_multi_wakeup(multi_handle: Ptr[CURLM]): CURLMcode = extern
 
   def curl_multi_perform(multi_handle: Ptr[CURLM], running_handles: Ptr[CInt]): CURLMcode = extern
 
@@ -263,6 +266,14 @@ private[curl] object libcurl {
       curl: Ptr[CURL],
       option: CURLOPT_WS_OPTIONS.type,
       flags: CLong,
+  ): CURLcode =
+    extern
+
+  @name("curl_easy_setopt")
+  def curl_easy_setopt_no_signal(
+      curl: Ptr[CURL],
+      option: CURLOPT_NOSIGNAL.type,
+      value: CLong,
   ): CURLcode =
     extern
 

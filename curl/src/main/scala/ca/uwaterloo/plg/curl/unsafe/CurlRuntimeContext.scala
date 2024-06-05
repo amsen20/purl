@@ -12,8 +12,11 @@ abstract class CurlRuntimeContext {
     */
   def addHandle(handle: Ptr[libcurl.CURL], cb: Either[Throwable, Unit] => Unit): Unit = ???
 
-  /** Clean up the runtime background processes
-    * and handles
+  /** Make it possible to keep track of some objects
+    * so that they are reachable as long as they are reachable
+    * from the runtime context.
+    *
+    * @param obj
     */
-  def cleanUp(): Unit = ???
+  def keepTrack(obj: Object): Unit = ???
 }

@@ -9,41 +9,56 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.JavaConversions._
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
+import java.util.concurrent.locks
 
 /** The multi curl scheduler that polls periodically for new events.
   * The scheduler is located in a parallel thread.
   *
   * @param multiHandle
-  * @param pollEvery
+  * @param maxConcurrentConnections
+  * @param maxConnections
   */
-final private[curl] class CurlMultiScheduler(multiHandle: Ptr[libcurl.CURLM], pollEvery: Int)
-    extends CurlRuntimeContext {
+final private[curl] class CurlMultiScheduler(
+    multiHandle: Ptr[libcurl.CURLM],
+    maxConcurrentConnections: Int,
+    maxConnections: Int,
+) extends CurlRuntimeContext {
+
+  private val gcRoot = new GCRoot()
 
   // Shared mutable state, should be accessed only in synchronized block
+  private val callbacksBuffer = mutable.Map[Ptr[libcurl.CURL], Either[Throwable, Unit] => Unit]()
   private val callbacks = mutable.Map[Ptr[libcurl.CURL], Either[Throwable, Unit] => Unit]()
 
   @volatile private var running = true
-  @volatile private var exception = Option.empty[Throwable]
+  @volatile private var reason = Option.empty[Throwable]
 
-  // Main loop that polls for new events
+  /** Main loop that polls for new events
+    * and adds new handles to the multi handle
+    * when there is space for them.
+    */
   def loop(): Unit =
     while (synchronized(running)) {
-      val until = System.currentTimeMillis() + pollEvery
-
-      try
-        poll(Duration(until - System.currentTimeMillis(), "ms"))
+      try poll(Duration.Inf)
       catch {
         case e =>
           synchronized:
-            callbacks.foreach(_._2(Left(e)))
-            callbacks.clear()
-            exception = Some(e)
             running = false
+            reason = Some(e)
       }
 
-      val sleepAmount = until - System.currentTimeMillis()
-      if sleepAmount > 0 then Thread.sleep(until - System.currentTimeMillis())
+      synchronized:
+        while (callbacks.size < maxConcurrentConnections && callbacksBuffer.nonEmpty) {
+          val (handle, cb) = callbacksBuffer.head
+          callbacksBuffer.remove(handle)
+          callbacks(handle) = cb
+
+          val code = libcurl.curl_multi_add_handle(multiHandle, handle)
+          if (code.isError)
+            throw CurlError.fromMCode(code)
+        }
     }
+    cleanUp()
 
   def poll(timeout: Duration): Boolean = {
     val timeoutIsInf = timeout == Duration.Inf
@@ -80,7 +95,7 @@ final private[curl] class CurlMultiScheduler(multiHandle: Ptr[libcurl.CURLM], po
           val msgsInQueue = stackalloc[CInt]()
           val info = libcurl.curl_multi_info_read(multiHandle, msgsInQueue)
 
-          if (info != null) {
+          if (info != null && synchronized(running)) {
             val curMsg = libcurl.curl_CURLMsg_msg(info)
             if (curMsg == libcurl_const.CURLMSG_DONE) {
               val handle = libcurl.curl_CURLMsg_easy_handle(info)
@@ -107,6 +122,17 @@ final private[curl] class CurlMultiScheduler(multiHandle: Ptr[libcurl.CURLM], po
     }
   }
 
+  def stop(): Unit =
+    synchronized:
+      if (!running) return // already stopped
+
+      running = false
+      reason = Some(new RuntimeException("CurlMultiScheduler is not running anymore"))
+
+      val code = libcurl.curl_multi_wakeup(multiHandle)
+      if (code.isError)
+        throw CurlError.fromMCode(code)
+
   /** Adds a curl handler that is expected to terminate
     * like a normal http request
     *
@@ -117,40 +143,50 @@ final private[curl] class CurlMultiScheduler(multiHandle: Ptr[libcurl.CURLM], po
     * @param handle curl easy handle to add
     * @param cb callback to run when this handler has finished its transfer
     */
-  override def addHandle(handle: Ptr[libcurl.CURL], cb: Either[Throwable, Unit] => Unit): Unit = {
-    val code = libcurl.curl_multi_add_handle(multiHandle, handle)
-    if (code.isError)
-      throw CurlError.fromMCode(code)
-
+  override def addHandle(handle: Ptr[libcurl.CURL], cb: Either[Throwable, Unit] => Unit): Unit =
     synchronized:
-      if (exception.isDefined)
-        cb(Left(exception.get))
+      if (reason.isDefined) cb(Left(reason.get))
       else
-        callbacks(handle) = cb
-  }
+        if (callbacks.size >= maxConnections)
+          cb(Left(new RuntimeException("number of connections exceeded the limit")))
+
+        callbacksBuffer(handle) = cb
+
+        if (callbacks.size < maxConcurrentConnections) {
+          val code = libcurl.curl_multi_wakeup(multiHandle)
+          if (code.isError)
+            throw CurlError.fromMCode(code)
+        }
+
+  /** Keeps track of the object to prevent it from being garbage collected
+    */
+  override def keepTrack(obj: Object): Unit =
+    gcRoot.addRoot(obj)
 
   /** Cleans up all the easy handles
     */
-  override def cleanUp(): Unit =
-    synchronized:
-      callbacks.foreach { case (handle, cb) =>
-        callbacks.remove(handle)
-        cb(Left(new RuntimeException("CurlMultiScheduler is shutting down")))
+  def cleanUp(): Unit =
+    (callbacks ++ callbacksBuffer).foreach { case (handle, cb) =>
+      cb(Left(reason.get))
 
-        val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
-        if (code.isError)
-          throw CurlError.fromMCode(code)
-        libcurl.curl_easy_cleanup(handle)
-      }
+      val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
+      if (code.isError)
+        throw CurlError.fromMCode(code)
+      libcurl.curl_easy_cleanup(handle)
+    }
+
+    callbacks.clear()
+    callbacksBuffer.clear()
 }
 
 private[curl] object CurlMultiScheduler {
 
   def getWithCleanUp(
       multiHandle: Ptr[libcurl.CURLM],
-      pollEvery: Int,
+      maxConcurrentConnections: Int,
+      maxConnections: Int,
   ): (CurlMultiScheduler, () => Unit) = {
-    val scheduler = new CurlMultiScheduler(multiHandle, pollEvery)
+    val scheduler = new CurlMultiScheduler(multiHandle, maxConcurrentConnections, maxConnections)
 
     // It is not a daemon thread,
     // because we want to wait for it to finish gracefully.
@@ -158,9 +194,12 @@ private[curl] object CurlMultiScheduler {
     pollerThread.start()
 
     val cleanUp = () => {
-      synchronized:
-        scheduler.running = false
-      scheduler.cleanUp()
+      // Notify the poller to stop
+      scheduler.stop()
+
+      // Wait for the poller to finish
+      // and clean up all the handles
+      pollerThread.join()
     }
 
     (scheduler, cleanUp)

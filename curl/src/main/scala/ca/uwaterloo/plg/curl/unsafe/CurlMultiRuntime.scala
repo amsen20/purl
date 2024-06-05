@@ -13,7 +13,7 @@ import scala.scalanative.unsafe._
   */
 object CurlMultiRuntime extends CurlRuntime {
 
-  def apply[T](body: CurlRuntimeContext ?=> T) =
+  def apply[T](maxConcurrentConnections: Int, maxConnections: Int)(body: CurlRuntimeContext ?=> T) =
     var multiHandle: Ptr[CURLM] = null
     var scheduler: CurlMultiScheduler = null
     var schedulerCleanUp: () => Unit = null
@@ -27,7 +27,8 @@ object CurlMultiRuntime extends CurlRuntime {
       if (multiHandle == null)
         throw new RuntimeException("curl_multi_init")
 
-      val schedulerShutDown = CurlMultiScheduler.getWithCleanUp(multiHandle, 64)
+      val schedulerShutDown =
+        CurlMultiScheduler.getWithCleanUp(multiHandle, maxConcurrentConnections, maxConnections)
       scheduler = schedulerShutDown._1
       schedulerCleanUp = schedulerShutDown._2
 
@@ -40,8 +41,8 @@ object CurlMultiRuntime extends CurlRuntime {
       val code =
         if multiHandle != null then libcurl.curl_multi_cleanup(multiHandle) else CURLMcode(0)
 
-      libcurl.curl_global_cleanup()
       if (multiHandle != null && code.isError)
         throw CurlError.fromMCode(code)
+      libcurl.curl_global_cleanup()
     }
 }
