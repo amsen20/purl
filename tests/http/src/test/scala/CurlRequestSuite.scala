@@ -1,9 +1,9 @@
-package curl
+package gurl
 
-import curl.http.simple.{HttpMethod, HttpVersion, SimpleRequest}
-import curl.http.CurlRequest
-import curl.multi.CurlMultiRuntime
-import curl.CurlError
+import gurl.http.simple.{HttpMethod, HttpVersion, SimpleRequest}
+import gurl.http.CurlRequest
+import gurl.multi.CurlMultiRuntime
+import gurl.CurlError
 
 import scala.util.Success
 import gears.async.default.given
