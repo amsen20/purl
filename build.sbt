@@ -55,7 +55,8 @@ lazy val modules = List(
   testServer,
   testCommon,
   httpTestSuite,
-) 
+  multiTestSuite,
+)
 // For now we do not support websocket on Scala Native
 // ++ when(sys.env.get("EXPERIMENTAL").contains("yes"))(websocketTestSuite)
 
@@ -116,7 +117,7 @@ lazy val testCommon = project
 lazy val httpTestSuite = project
   .in(file("tests/http"))
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(testCommon)
+  .dependsOn(curl)
   .settings(
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion,
@@ -125,10 +126,17 @@ lazy val httpTestSuite = project
     testFrameworks += new TestFramework("munit.Framework"),
   )
 
-lazy val websocketTestSuite = project
-  .in(file("tests/websocket"))
+lazy val multiTestSuite = project
+  .in(file("tests/multi"))
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(testCommon)
+  .dependsOn(curl)
+  .settings(
+    libraryDependencies ++= Seq(
+      "ch.epfl.lamp" %%% "gears" % gearsVersion,
+      "org.scalameta" %%% "munit" % munitVersion % Test,
+    ),
+    testFrameworks += new TestFramework("munit.Framework"),
+  )
 
 lazy val startTestServer = taskKey[Unit]("starts test server if not running")
 lazy val stopTestServer = taskKey[Unit]("stops test server if running")
