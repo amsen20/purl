@@ -2,7 +2,7 @@ package ca.uwaterloo.plg.curl
 
 import ca.uwaterloo.plg.curl.http.simple.{HttpMethod, HttpVersion, SimpleRequest}
 import ca.uwaterloo.plg.curl.http.CurlRequest
-import ca.uwaterloo.plg.curl.unsafe.CurlMultiRuntime
+import ca.uwaterloo.plg.curl.multi.CurlMultiRuntime
 import ca.uwaterloo.plg.curl.CurlError
 
 import scala.util.Success

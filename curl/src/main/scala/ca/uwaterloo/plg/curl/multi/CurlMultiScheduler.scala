@@ -1,12 +1,12 @@
 package ca.uwaterloo.plg.curl
-package unsafe
+package multi
 
 import ca.uwaterloo.plg.curl.CurlError
+import ca.uwaterloo.plg.curl.unsafe._
 
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.concurrent.ExecutionContext
-import scala.concurrent.JavaConversions._
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
 import java.util.concurrent.locks

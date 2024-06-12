@@ -1,7 +1,8 @@
 package ca.uwaterloo.plg.curl
-package unsafe
+package multi
 
 import ca.uwaterloo.plg.curl.unsafe.libcurl.CURLM
+import ca.uwaterloo.plg.curl.unsafe._
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
@@ -31,7 +32,11 @@ object CurlMultiRuntime extends CurlRuntime {
         throw new RuntimeException("curl_multi_init")
 
       val schedulerShutDown =
-        CurlMultiScheduler.getWithCleanUp(multiHandle, maxConcurrentConnections, maxConnections)
+        CurlMultiScheduler.getWithCleanUp(
+          multiHandle,
+          maxConcurrentConnections,
+          maxConnections,
+        )
       scheduler = schedulerShutDown._1
       schedulerCleanUp = schedulerShutDown._2
 

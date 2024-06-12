@@ -2,7 +2,8 @@ package ca.uwaterloo.plg.curl
 
 import ca.uwaterloo.plg.curl.http.simple.{HttpMethod, HttpVersion, SimpleRequest, SimpleResponse}
 import ca.uwaterloo.plg.curl.http.CurlRequest
-import ca.uwaterloo.plg.curl.unsafe.{CurlMultiRuntime, CurlRuntimeContext}
+import ca.uwaterloo.plg.curl.unsafe.{CurlRuntimeContext}
+import ca.uwaterloo.plg.curl.multi.CurlMultiRuntime
 
 import scala.util.Success
 import gears.async.default.given
