@@ -1,4 +1,4 @@
-package ca.uwaterloo.plg.curl
+package gurl
 package internal
 
 import scala.scalanative.runtime
@@ -7,7 +7,7 @@ import scala.scalanative.unsafe._
 import scala.scalanative.libc.string._
 import scala.collection.mutable.ArrayBuffer
 
-private[curl] object Utils {
+private[gurl] object Utils {
   def toPtr(a: AnyRef): Ptr[Byte] =
     runtime.fromRawPtr(Intrinsics.castObjectToRawPtr(a))
 

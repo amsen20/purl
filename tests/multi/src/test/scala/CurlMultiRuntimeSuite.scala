@@ -1,9 +1,9 @@
-package ca.uwaterloo.plg.curl
+package gurl
 
-import ca.uwaterloo.plg.curl.http.simple.{HttpMethod, HttpVersion, SimpleRequest, SimpleResponse}
-import ca.uwaterloo.plg.curl.http.CurlRequest
-import ca.uwaterloo.plg.curl.unsafe.{CurlRuntimeContext}
-import ca.uwaterloo.plg.curl.multi.CurlMultiRuntime
+import gurl.http.simple.{HttpMethod, HttpVersion, SimpleRequest, SimpleResponse}
+import gurl.http.CurlRequest
+import gurl.unsafe.CurlRuntimeContext
+import gurl.multi.CurlMultiRuntime
 
 import scala.util.Success
 import gears.async.default.given
@@ -14,6 +14,7 @@ import scala.util.Try
 import scala.annotation.static
 import scala.annotation.internal.requiresCapability
 import scala.concurrent.duration.FiniteDuration
+import gurl.CurlError
 
 class CurlMultiRuntimeSuite extends munit.FunSuite {
 

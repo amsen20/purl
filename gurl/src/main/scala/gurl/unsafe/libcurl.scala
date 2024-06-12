@@ -1,4 +1,4 @@
-package ca.uwaterloo.plg.curl
+package gurl
 package unsafe
 
 import scala.scalanative.unsafe._
@@ -6,7 +6,7 @@ import scala.scalanative.unsigned._
 
 import libcurl_const._
 
-private[curl] object libcurl_const {
+private[gurl] object libcurl_const {
   final val CURLMSG_DONE: UInt = 1.toUInt
 
   final val CURLOPTTYPE_LONG = 0
@@ -62,24 +62,24 @@ private[curl] object libcurl_const {
   final val CURLWS_RAW_MODE = 1 << 0
 }
 
-final private[curl] case class CURLcode(value: CInt) extends AnyVal {
+final private[gurl] case class CURLcode(value: CInt) extends AnyVal {
   @inline def isOk: Boolean = value == 0
   @inline def isError: Boolean = value != 0
 }
-final private[curl] case class CURLMcode(value: CInt) extends AnyVal {
+final private[gurl] case class CURLMcode(value: CInt) extends AnyVal {
   @inline def isOk: Boolean = value == 0
   @inline def isError: Boolean = value != 0
 }
 
 @link("curl")
 @extern
-private[curl] object libcurl {
+private[gurl] object libcurl {
 
   type CURL
-  type CURLcode = ca.uwaterloo.plg.curl.unsafe.CURLcode
+  type CURLcode = gurl.unsafe.CURLcode
 
   type CURLM
-  type CURLMcode = ca.uwaterloo.plg.curl.unsafe.CURLMcode
+  type CURLMcode = gurl.unsafe.CURLMcode
 
   type CURLMSG = CUnsignedInt
   type CURLMsg

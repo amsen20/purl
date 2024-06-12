@@ -1,8 +1,8 @@
-package ca.uwaterloo.plg.curl
+package gurl
 package multi
 
-import ca.uwaterloo.plg.curl.unsafe.libcurl.CURLM
-import ca.uwaterloo.plg.curl.unsafe._
+import gurl.unsafe.libcurl.CURLM
+import gurl.unsafe._
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext

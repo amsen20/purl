@@ -1,15 +1,15 @@
-package ca.uwaterloo.plg.curl
+package gurl
 package http
 
-import ca.uwaterloo.plg.curl.internal.Utils
-import ca.uwaterloo.plg.curl.unsafe.libcurl_const
+import gurl.internal.Utils
+import gurl.unsafe.libcurl_const
 
 import scalanative.unsafe._
 import scalanative.libc.string._
 import scalanative.unsigned._
 import scala.collection.mutable.ArrayBuffer
 
-final private[curl] class RequestSend private (
+final private[gurl] class RequestSend private (
     val content: Array[Byte],
     var offset: Int,
 ) {
@@ -27,11 +27,11 @@ final private[curl] class RequestSend private (
     copyAmountUSize
 }
 
-private[curl] object RequestSend {
+private[gurl] object RequestSend {
   def apply(content: Array[Byte]): RequestSend =
     new RequestSend(content, 0)
 
-  private[curl] def readCallback(
+  private[gurl] def readCallback(
       buffer: Ptr[CChar],
       size: CSize,
       nitems: CSize,

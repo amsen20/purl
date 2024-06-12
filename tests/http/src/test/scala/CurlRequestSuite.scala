@@ -1,9 +1,9 @@
-package ca.uwaterloo.plg.curl
+package curl
 
-import ca.uwaterloo.plg.curl.http.simple.{HttpMethod, HttpVersion, SimpleRequest}
-import ca.uwaterloo.plg.curl.http.CurlRequest
-import ca.uwaterloo.plg.curl.multi.CurlMultiRuntime
-import ca.uwaterloo.plg.curl.CurlError
+import curl.http.simple.{HttpMethod, HttpVersion, SimpleRequest}
+import curl.http.CurlRequest
+import curl.multi.CurlMultiRuntime
+import curl.CurlError
 
 import scala.util.Success
 import gears.async.default.given

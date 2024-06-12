@@ -1,8 +1,8 @@
-package ca.uwaterloo.plg.curl
+package gurl
 package multi
 
-import ca.uwaterloo.plg.curl.CurlError
-import ca.uwaterloo.plg.curl.unsafe._
+import gurl.CurlError
+import gurl.unsafe._
 
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
@@ -18,7 +18,7 @@ import java.util.concurrent.locks
   * @param maxConcurrentConnections
   * @param maxConnections
   */
-final private[curl] class CurlMultiScheduler(
+final private[gurl] class CurlMultiScheduler(
     multiHandle: Ptr[libcurl.CURLM],
     maxConcurrentConnections: Int,
     maxConnections: Int,
@@ -206,7 +206,7 @@ final private[curl] class CurlMultiScheduler(
     removedHandles.clear()
 }
 
-private[curl] object CurlMultiScheduler {
+private[gurl] object CurlMultiScheduler {
 
   def getWithCleanUp(
       multiHandle: Ptr[libcurl.CURLM],

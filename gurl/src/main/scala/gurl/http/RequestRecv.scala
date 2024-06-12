@@ -1,10 +1,10 @@
-package ca.uwaterloo.plg.curl
+package gurl
 package http
 
-import ca.uwaterloo.plg.curl.internal.Utils
-import ca.uwaterloo.plg.curl.unsafe.libcurl_const
-import ca.uwaterloo.plg.curl.http.simple._
-import ca.uwaterloo.plg.curl.unsafe.CurlRuntimeContext
+import gurl.internal.Utils
+import gurl.unsafe.libcurl_const
+import gurl.http.simple._
+import gurl.unsafe.CurlRuntimeContext
 
 import gears.async.Future
 import scalanative.unsigned._
@@ -22,7 +22,7 @@ private enum HeaderLine:
   case Line(content: Array[Byte])
   case CRLF
 
-final private[curl] class RequestRecv {
+final private[gurl] class RequestRecv {
 
   // Mutable shared state.
   val responseBody: ArrayBuffer[Byte] = ArrayBuffer[Byte]()
@@ -110,10 +110,10 @@ final private[curl] class RequestRecv {
   }
 }
 
-private[curl] object RequestRecv {
+private[gurl] object RequestRecv {
   def apply(): RequestRecv = new RequestRecv()
 
-  private[curl] def headerCallback(
+  private[gurl] def headerCallback(
       buffer: Ptr[CChar],
       size: CSize,
       nitems: CSize,
@@ -121,7 +121,7 @@ private[curl] object RequestRecv {
   ): CSize =
     Utils.fromPtr[RequestRecv](userdata).onHeader(buffer, size, nitems)
 
-  private[curl] def writeCallback(
+  private[gurl] def writeCallback(
       buffer: Ptr[CChar],
       size: CSize,
       nmemb: CSize,

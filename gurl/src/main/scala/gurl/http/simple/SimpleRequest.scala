@@ -1,4 +1,4 @@
-package ca.uwaterloo.plg.curl.http
+package gurl.http
 package simple
 
 case class SimpleRequest(

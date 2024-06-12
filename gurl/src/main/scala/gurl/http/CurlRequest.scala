@@ -1,10 +1,10 @@
-package ca.uwaterloo.plg.curl
+package gurl
 package http
 
-import ca.uwaterloo.plg.curl.internal._
-import ca.uwaterloo.plg.curl.unsafe.CurlRuntimeContext
-import ca.uwaterloo.plg.curl.http.simple._
-import ca.uwaterloo.plg.curl.unsafe.libcurl_const
+import gurl.internal._
+import gurl.unsafe.CurlRuntimeContext
+import gurl.http.simple._
+import gurl.unsafe.libcurl_const
 
 import scala.scalanative.unsafe._
 import gears.async.Async

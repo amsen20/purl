@@ -1,17 +1,17 @@
-package ca.uwaterloo.plg.curl
+package gurl
 
 import munit.FunSuite
-import ca.uwaterloo.plg.curl.unsafe.CURLcode
-import ca.uwaterloo.plg.curl.CurlError
+import gurl.unsafe.CURLcode
+import gurl.CurlError
 
 class ErrorCodeSuite extends FunSuite {
   test("sanity") {
-    val error = CurlError.fromCode(CURLcode(1))
+    val error = gurl.CurlError.fromCode(CURLcode(1))
     assert(error.info.contains("Unsupported protocol"))
   }
 
   test("sanity") {
-    val error = CurlError.fromCode(CURLcode(7))
+    val error = gurl.CurlError.fromCode(CURLcode(7))
     assert(error.info.contains("Couldn't connect to server"))
   }
 }

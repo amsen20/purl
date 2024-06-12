@@ -1,4 +1,4 @@
-package ca.uwaterloo.plg.curl.unsafe
+package gurl.unsafe
 
 import scala.collection.mutable
 

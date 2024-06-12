@@ -1,15 +1,15 @@
-package ca.uwaterloo.plg.curl
+package gurl
 package internal
 
-import ca.uwaterloo.plg.curl.CurlError
-import ca.uwaterloo.plg.curl.unsafe.CurlRuntimeContext
-import ca.uwaterloo.plg.curl.unsafe.libcurl._
-import ca.uwaterloo.plg.curl.unsafe.libcurl_const._
+import gurl.CurlError
+import gurl.unsafe.CurlRuntimeContext
+import gurl.unsafe.libcurl._
+import gurl.unsafe.libcurl_const._
 
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
 
-final private[curl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[CChar]) {
+final private[gurl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[CChar]) {
 
   @inline private def throwOnError(thunk: => CURLcode): Unit = {
     val code = thunk
@@ -92,7 +92,7 @@ final private[curl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[
   * It is non-blocking but synchronous.
   * For having it async, you can wrap it in a Future.
   */
-private[curl] object CurlEasy {
+private[gurl] object CurlEasy {
   final private val CURL_ERROR_SIZE = 256L
 
   def withEasy[T](body: CurlRuntimeContext ?=> CurlEasy => T)(using CurlRuntimeContext): T =

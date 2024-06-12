@@ -1,7 +1,7 @@
-package ca.uwaterloo.plg.curl
+package gurl
 
 import munit.FunSuite
-import ca.uwaterloo.plg.curl.unsafe.CurlRuntime
+import gurl.unsafe.CurlRuntime
 
 class CurlRuntimeSuite extends FunSuite {
 
