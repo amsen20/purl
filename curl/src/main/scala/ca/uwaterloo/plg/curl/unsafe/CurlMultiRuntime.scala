@@ -10,6 +10,9 @@ import scala.scalanative.unsafe._
 /** The runtime context for the curl multi interface
   * It allows to run multiple easy handles non-blocking and concurrently.
   * When the runtime is finished, all the easy handles are closed as well.
+  * The creation of the multi runtime is blocking, and it waits until:
+  * - an error occurs
+  * - the body execution is finished
   */
 object CurlMultiRuntime extends CurlRuntime {
 
