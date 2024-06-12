@@ -67,7 +67,6 @@ class CurlRequestSuite extends munit.FunSuite {
           case Success(response) =>
             fail("should have failed")
           case Failure(exception) =>
-            println(exception.toString())
             assert(exception.isInstanceOf[CurlError])
   }
 
@@ -75,7 +74,6 @@ class CurlRequestSuite extends munit.FunSuite {
     Async.blocking:
       CurlMultiRuntime(Int.MaxValue, Int.MaxValue):
         for msg <- List("a") do
-          println("Current time: " + System.currentTimeMillis())
           CurlRequest(
             SimpleRequest(
               HttpVersion.V1_0,
@@ -88,7 +86,6 @@ class CurlRequestSuite extends munit.FunSuite {
             case Success(response) =>
               assert(response.body.map(_.toChar).mkString.contains(msg))
             case Failure(exception) =>
-              println(exception.toString())
               fail("couldn't get the response", exception)
   }
 }
