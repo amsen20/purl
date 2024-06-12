@@ -6,7 +6,7 @@ Everyone is expected to follow the [Scala Code of Conduct] when discussing the p
 
 ## Moderation
 
-For any questions, concerns, or moderation requests, please contact a member of the [community staff](https://http4s.org/code-of-conduct.html#moderation)
+For any questions, concerns, or moderation requests, please add an issue or a pull-request to the repository in GitHub.
 
 [Scala Code of Conduct]: https://http4s.org/code-of-conduct.html
-[Community staff]: https://http4s.org/code-of-conduct.html#moderation
+[Repository]: https://github.com/amsen20/gurl/
