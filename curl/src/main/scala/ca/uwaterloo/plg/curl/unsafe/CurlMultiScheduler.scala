@@ -27,14 +27,16 @@ final private[curl] class CurlMultiScheduler(
   private val gcRoot = new GCRoot()
 
   // Shared mutable state, should be accessed only in synchronized block
-  private val callbacksBuffer = mutable.Map[Ptr[libcurl.CURL], Either[Throwable, Unit] => Unit]()
-  private val callbacks = mutable.Map[Ptr[libcurl.CURL], Either[Throwable, Unit] => Unit]()
+  private val callbacksBuffer = mutable.Map[Ptr[libcurl.CURL], Option[Throwable] => Unit]()
+  private val callbacks = mutable.Map[Ptr[libcurl.CURL], Option[Throwable] => Unit]()
+  private val removedHandles = mutable.Set[Ptr[libcurl.CURL]]()
 
   @volatile private var running = true
   @volatile private var reason = Option.empty[Throwable]
 
   /** Main loop that polls for new events
-    * and adds new handles to the multi handle
+    * and removes handles from the multi handle
+    * and then adds new handles to the multi handle
     * when there is space for them.
     */
   def loop(): Unit =
@@ -48,6 +50,19 @@ final private[curl] class CurlMultiScheduler(
       }
 
       synchronized:
+        // Remove handles that are already deleted
+        // from the list of callbacks, but they are still
+        // (must be) in the multi handle.
+        removedHandles.foreach(handle =>
+          val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
+          if code.isError then throw CurlError.fromMCode(code)
+
+          libcurl.curl_easy_cleanup(handle)
+        )
+        removedHandles.clear()
+
+        // Add new handles to the multi handle from
+        // the callback buffer.
         while (callbacks.size < maxConcurrentConnections && callbacksBuffer.nonEmpty) {
           val (handle, cb) = callbacksBuffer.head
           callbacksBuffer.remove(handle)
@@ -103,15 +118,20 @@ final private[curl] class CurlMultiScheduler(
                 callbacks.remove(handle).foreach { cb =>
                   val result = libcurl.curl_CURLMsg_data_result(info)
                   cb(
-                    if (result.isOk) Right(())
-                    else Left(CurlError.fromCode(result))
+                    if (result.isOk) None
+                    else Some(CurlError.fromCode(result))
                   )
                 }
 
-              val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
-              if (code.isError)
-                throw CurlError.fromMCode(code)
-              libcurl.curl_easy_cleanup(handle)
+                val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
+                if (code.isError)
+                  throw CurlError.fromMCode(code)
+                libcurl.curl_easy_cleanup(handle)
+                // Should deletes the handle from removed list,
+                // because if the list is in the list then, the callback
+                // is removed so it is not called and now here, the handle
+                // is cleaned up.
+                removedHandles.remove(handle)
             }
             true
           } else false
@@ -133,22 +153,12 @@ final private[curl] class CurlMultiScheduler(
       if (code.isError)
         throw CurlError.fromMCode(code)
 
-  /** Adds a curl handler that is expected to terminate
-    * like a normal http request
-    *
-    * IMPORTANT NOTE: if you add a transfer that does not terminate (e.g. websocket) using this method,
-    * application might hang, because those transfer don't seem to change state,
-    * so it's not distinguishable whether they are finished or have other work to do
-    *
-    * @param handle curl easy handle to add
-    * @param cb callback to run when this handler has finished its transfer
-    */
-  override def addHandle(handle: Ptr[libcurl.CURL], cb: Either[Throwable, Unit] => Unit): Unit =
+  override def addHandle(handle: Ptr[libcurl.CURL], cb: Option[Throwable] => Unit): Unit =
     synchronized:
-      if (reason.isDefined) cb(Left(reason.get))
+      if (reason.isDefined) cb(Some(reason.get))
       else
         if (callbacks.size >= maxConnections)
-          cb(Left(new RuntimeException("number of connections exceeded the limit")))
+          cb(Some(new RuntimeException("number of connections exceeded the limit")))
 
         callbacksBuffer(handle) = cb
 
@@ -158,6 +168,17 @@ final private[curl] class CurlMultiScheduler(
             throw CurlError.fromMCode(code)
         }
 
+  override def removeHandle(handle: Ptr[libcurl.CURL]): Unit =
+    synchronized:
+      val cb = callbacks.remove(handle)
+      if cb.isDefined then removedHandles.add(handle)
+      val cbb = callbacksBuffer.remove(handle)
+
+      if cb.isDefined || cbb.isDefined then
+        val code = libcurl.curl_multi_wakeup(multiHandle)
+        if (code.isError)
+          throw CurlError.fromMCode(code)
+
   /** Keeps track of the object to prevent it from being garbage collected
     */
   override def keepTrack(obj: Object): Unit =
@@ -166,9 +187,14 @@ final private[curl] class CurlMultiScheduler(
   /** Cleans up all the easy handles
     */
   def cleanUp(): Unit =
-    (callbacks ++ callbacksBuffer).foreach { case (handle, cb) =>
-      cb(Left(reason.get))
+    // Inform their callbacks that the
+    // polling is stopped.
+    (callbacks ++ callbacksBuffer).foreach(_._2(reason))
 
+    // Remove the handles from multi handle for
+    // terminating all connections and cleaning multi handle
+    // peacefully.
+    (callbacks.map(_._1) ++ removedHandles).foreach { case handle =>
       val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
       if (code.isError)
         throw CurlError.fromMCode(code)
@@ -177,6 +203,7 @@ final private[curl] class CurlMultiScheduler(
 
     callbacks.clear()
     callbacksBuffer.clear()
+    removedHandles.clear()
 }
 
 private[curl] object CurlMultiScheduler {

@@ -11,6 +11,7 @@ import gears.async.Async
 import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
+import java.util.concurrent.CancellationException
 
 object CurlRequest {
   private def setup(
@@ -64,19 +65,28 @@ object CurlRequest {
         Zone:
           CurlSList.withSList(headers =>
             req.headers.foreach(headers.append(_))
-            setup(
-              handle,
-              sendData,
-              recvData,
-              req.httpVersion.toString,
-              req.method.toString,
-              headers,
-              req.uri,
-            )
-            recvData.response()
+            try {
+              setup(
+                handle,
+                sendData,
+                recvData,
+                req.httpVersion.toString,
+                req.method.toString,
+                headers,
+                req.uri,
+              )
+              recvData.response()
+            } catch {
+              case e: Throwable =>
+                val cc = summon[CurlRuntimeContext]
+                cc.removeHandle(handle.curl)
+                throw e
+            }
           )
       }
     catch {
+      case e: CancellationException =>
+        throw e
       case e: Throwable => Failure(e)
     }
 }

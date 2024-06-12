@@ -66,11 +66,11 @@ final private[curl] class RequestRecv {
       case _ => parseResponse(headersList.tail)
   }
 
-  @inline def onTerminated(res: Either[Throwable, Unit]): Unit =
+  @inline def onTerminated(res: Option[Throwable]): Unit =
     if result.poll().isEmpty then
       res match
-        case Left(ex) => result.complete(Failure(ex))
-        case Right(_) => result.complete(parseResponse(synchronized(responseHeaders.toList)))
+        case Some(e) => result.complete(Failure(e))
+        case None => result.complete(parseResponse(synchronized(responseHeaders.toList)))
 
   @inline def onWrite(
       buffer: Ptr[CChar],
