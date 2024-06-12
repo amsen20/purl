@@ -50,7 +50,7 @@ ThisBuild / envVars ++= {
 def when(pred: => Boolean)(refs: CompositeProject*) = if (pred) refs else Nil
 
 lazy val modules = List(
-  curl,
+  gurl,
   example,
   testServer,
   testCommon,
@@ -65,8 +65,8 @@ lazy val root =
     .enablePlugins(NoPublishPlugin)
     .aggregate(modules: _*)
 
-lazy val curl = project
-  .in(file("curl"))
+lazy val gurl = project
+  .in(file("gurl"))
   .enablePlugins(ScalaNativePlugin)
   .settings(
     name := "gurl",
@@ -78,7 +78,7 @@ lazy val curl = project
 lazy val example = project
   .in(file("example"))
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(curl)
+  .dependsOn(gurl)
   .settings(
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion
@@ -105,7 +105,7 @@ lazy val testServer = project
 lazy val testCommon = project
   .in(file("tests/common"))
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(curl)
+  .dependsOn(gurl)
   .settings(
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion,
@@ -117,7 +117,7 @@ lazy val testCommon = project
 lazy val httpTestSuite = project
   .in(file("tests/http"))
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(curl)
+  .dependsOn(gurl)
   .settings(
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion,
@@ -129,7 +129,7 @@ lazy val httpTestSuite = project
 lazy val multiTestSuite = project
   .in(file("tests/multi"))
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(curl)
+  .dependsOn(gurl)
   .settings(
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion,
