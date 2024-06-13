@@ -8,5 +8,5 @@ Everyone is expected to follow the [Scala Code of Conduct] when discussing the p
 
 For any questions, concerns, or moderation requests, please add an issue or a pull-request to the repository in GitHub.
 
-[Scala Code of Conduct]: https://http4s.org/code-of-conduct.html
+[Scala Code of Conduct]: https://www.scala-lang.org/conduct/
 [Repository]: https://github.com/amsen20/gurl/
