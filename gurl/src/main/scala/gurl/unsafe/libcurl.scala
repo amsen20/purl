@@ -24,11 +24,14 @@ private[gurl] object libcurl_const {
   final val CURLOPT_WRITEDATA = CURLOPTTYPE_OBJECTPOINT + 1
   final val CURLOPT_READFUNCTION = CURLOPTTYPE_FUNCTIONPOINT + 12
   final val CURLOPT_READDATA = CURLOPTTYPE_OBJECTPOINT + 9
+  final val CURLOPT_XFERINFOFUNCTION = CURLOPTTYPE_FUNCTIONPOINT + 219
+  final val CURLOPT_XFERINFODATA = CURLOPTTYPE_OBJECTPOINT + 57
   final val CURLOPT_ERRORBUFFER = CURLOPTTYPE_OBJECTPOINT + 10
   final val CURLOPT_VERBOSE = CURLOPTTYPE_LONG + 41
   final val CURLOPT_UPLOAD = CURLOPTTYPE_LONG + 46
   final val CURLOPT_WS_OPTIONS = CURLOPTTYPE_LONG + 320
   final val CURLOPT_NOSIGNAL = CURLOPTTYPE_LONG + 99
+  final val CURLOPT_NOPROGRESS = CURLOPTTYPE_LONG + 43
 
   final val CURL_HTTP_VERSION_NONE = 0L
   final val CURL_HTTP_VERSION_1_0 = 1L
@@ -97,6 +100,8 @@ private[gurl] object libcurl {
   type write_callback = CFuncPtr4[Ptr[CChar], CSize, CSize, Ptr[Byte], CSize]
 
   type read_callback = CFuncPtr4[Ptr[CChar], CSize, CSize, Ptr[Byte], CSize]
+
+  type progress_callback = CFuncPtr5[Ptr[Byte], CLongLong, CLongLong, CLongLong, CLongLong, CInt]
 
   type curl_ws_frame = CStruct4[CInt, CInt, Long, Long] // age, flags, offset, bytesleft
 
@@ -232,6 +237,22 @@ private[gurl] object libcurl {
     extern
 
   @name("curl_easy_setopt")
+  def curl_easy_setopt_xferinfofunction(
+      curl: Ptr[CURL],
+      option: CURLOPT_XFERINFOFUNCTION.type,
+      progress_callback: progress_callback,
+  ): CURLcode =
+    extern
+
+  @name("curl_easy_setopt")
+  def curl_easy_setopt_xferinfodata(
+      curl: Ptr[CURL],
+      option: CURLOPT_XFERINFODATA.type,
+      pointer: Ptr[Byte],
+  ): CURLcode =
+    extern
+
+  @name("curl_easy_setopt")
   def curl_easy_setopt_upload(
       curl: Ptr[CURL],
       option: CURLOPT_UPLOAD.type,
@@ -252,6 +273,14 @@ private[gurl] object libcurl {
       curl: Ptr[CURL],
       option: CURLOPT_ERRORBUFFER.type,
       buffer: Ptr[CChar],
+  ): CURLcode =
+    extern
+
+  @name("curl_easy_setopt")
+  def curl_easy_setopt_noprogress(
+      curl: Ptr[CURL],
+      option: CURLOPT_NOPROGRESS.type,
+      value: CLong,
   ): CURLcode =
     extern
 
