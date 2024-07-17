@@ -3,6 +3,7 @@ package unsafe
 
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
+import scala.scalanative.posix.sys.select
 
 import libcurl_const._
 
@@ -63,6 +64,14 @@ private[gurl] object libcurl_const {
 
   // websocket options flags
   final val CURLWS_RAW_MODE = 1 << 0
+
+  // select constants
+  final val CURL_CSELECT_IN = 0x01
+  final val CURL_CSELECT_OUT = 0x02
+  final val CURL_CSELECT_ERR = 0x04
+
+  final val CURL_SOCKET_BAD = -1
+  final val CURL_SOCKET_TIMEOUT = CURL_SOCKET_BAD
 }
 
 final private[gurl] case class CURLcode(value: CInt) extends AnyVal {
@@ -90,6 +99,8 @@ private[gurl] object libcurl {
   type CURLoption = CUnsignedInt
 
   type CURLversion = CUnsignedInt
+
+  type curl_socket_t = CInt
 
   type curl_slist
 
@@ -127,7 +138,22 @@ private[gurl] object libcurl {
 
   def curl_multi_wakeup(multi_handle: Ptr[CURLM]): CURLMcode = extern
 
+  def curl_multi_fdset(
+      multi_handle: Ptr[CURLM],
+      read_fd_set: Ptr[select.fd_set],
+      write_fd_set: Ptr[select.fd_set],
+      exc_fd_set: Ptr[select.fd_set],
+      max_fd: Ptr[CInt],
+  ): CURLMcode = extern
+
   def curl_multi_perform(multi_handle: Ptr[CURLM], running_handles: Ptr[CInt]): CURLMcode = extern
+
+  def curl_multi_socket_action(
+      multi_handle: Ptr[CURLM],
+      sockfd: curl_socket_t,
+      ev_bitmask: CInt,
+      running_handles: Ptr[CInt],
+  ): CURLMcode = extern
 
   def curl_multi_info_read(multi_handle: Ptr[CURLM], msgs_in_queue: Ptr[CInt]): Ptr[CURLMsg] =
     extern

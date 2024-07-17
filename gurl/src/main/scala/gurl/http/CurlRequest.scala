@@ -5,6 +5,7 @@ import gurl.internal._
 import gurl.unsafe.CurlRuntimeContext
 import gurl.http.simple._
 import gurl.unsafe.libcurl_const
+import gurl.unsafe.CURLcode
 
 import scala.scalanative.unsafe._
 import gears.async.Async
@@ -18,12 +19,14 @@ object CurlRequest {
       handle: CurlEasy,
       sendData: RequestSend,
       recvData: RequestRecv,
+      progressData: RequestProgress,
       version: String,
       method: String,
       headers: CurlSList,
       uri: String,
   )(using cc: CurlRuntimeContext, zone: Zone): Unit = {
     // handle.setVerbose(true)
+
     handle.setCustomRequest(toCString(method))
 
     handle.setUpload(true)
@@ -52,8 +55,13 @@ object CurlRequest {
     handle.setWriteData(Utils.toPtr(recvData))
     handle.setWriteFunction(RequestRecv.writeCallback(_, _, _, _))
 
+    handle.setNoProgress(false)
+    handle.setProgressData(Utils.toPtr(progressData))
+    handle.setProgressFunction(RequestProgress.progressCallback(_, _, _, _, _))
+
     cc.keepTrack(sendData)
     cc.keepTrack(recvData)
+    cc.keepTrack(progressData)
     cc.addHandle(handle.curl, recvData.onTerminated)
   }
 
@@ -62,6 +70,7 @@ object CurlRequest {
       CurlEasy.withEasy { handle =>
         val sendData = RequestSend(req.body)
         val recvData = RequestRecv()
+        val progressData = RequestProgress()
         Zone:
           CurlSList.withSList(headers =>
             req.headers.foreach(headers.append(_))
@@ -70,6 +79,7 @@ object CurlRequest {
                 handle,
                 sendData,
                 recvData,
+                progressData,
                 req.httpVersion.toString,
                 req.method.toString,
                 headers,

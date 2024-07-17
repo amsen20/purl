@@ -60,6 +60,16 @@ final private[gurl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[
       pointer: Ptr[Byte]
   ): Unit = throwOnError(curl_easy_setopt_readdata(curl, CURLOPT_READDATA, pointer))
 
+  def setProgressFunction(
+      progress_callback: progress_callback
+  ): Unit = throwOnError(
+    curl_easy_setopt_xferinfofunction(curl, CURLOPT_XFERINFOFUNCTION, progress_callback)
+  )
+
+  def setProgressData(
+      pointer: Ptr[Byte]
+  ): Unit = throwOnError(curl_easy_setopt_xferinfodata(curl, CURLOPT_XFERINFODATA, pointer))
+
   def setUpload(value: Boolean): Unit =
     throwOnError(curl_easy_setopt_upload(curl, CURLOPT_UPLOAD, if (value) 1 else 0))
 
@@ -72,6 +82,9 @@ final private[gurl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[
 
   def setNoSignal(value: Boolean): Unit =
     throwOnError(curl_easy_setopt_no_signal(curl, CURLOPT_NOSIGNAL, if (value) 1 else 0))
+
+  def setNoProgress(value: Boolean): Unit =
+    throwOnError(curl_easy_setopt_noprogress(curl, CURLOPT_NOPROGRESS, if (value) 1 else 0))
 
   def wsSend(
       buffer: Ptr[Byte],
@@ -86,13 +99,13 @@ final private[gurl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[
   def pause(bitmask: CInt): Unit = throwOnError(curl_easy_pause(curl, bitmask))
 }
 
-/**
-  * An structured style of using curl_easy handle.
+/** An structured style of using curl_easy handle.
   * The handle can be used as the argument of the body function.
   * It is non-blocking but synchronous.
   * For having it async, you can wrap it in a Future.
   */
-private[gurl] object CurlEasy {
+/*private[gurl]*/
+object CurlEasy {
   final private val CURL_ERROR_SIZE = 256L
 
   def withEasy[T](body: CurlRuntimeContext ?=> CurlEasy => T)(using CurlRuntimeContext): T =

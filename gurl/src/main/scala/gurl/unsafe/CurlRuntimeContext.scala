@@ -2,6 +2,7 @@ package gurl
 package unsafe
 
 import scala.scalanative.unsafe.Ptr
+import scala.scalanative.unsafe._
 
 abstract class CurlRuntimeContext {
 
@@ -26,4 +27,16 @@ abstract class CurlRuntimeContext {
     * @param obj
     */
   def keepTrack(obj: Object): Unit = ???
+
+  /** Monitors the progress of a connection.
+    * For now this just abort when the scheduler is shutting down.
+    *
+    * @return 0 if the connection is still in progress
+    */
+  def monitorProgress(
+      dltotal: CLongLong,
+      dlnow: CLongLong,
+      ultotal: CLongLong,
+      ulnow: CLongLong,
+  ): CInt = ???
 }
