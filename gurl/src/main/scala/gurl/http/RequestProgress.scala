@@ -11,9 +11,7 @@ final private[gurl] class RequestProgress(using cc: CurlRuntimeContext) {
       ultotal: CLongLong,
       ulnow: CLongLong,
   ): CInt =
-    val c = cc.monitorProgress(dltotal, dlnow, ultotal, ulnow)
-    printf("monitor progress returned: %d\n", c)
-    c
+    cc.monitorProgress(dltotal, dlnow, ultotal, ulnow)
 }
 
 private[gurl] object RequestProgress {
