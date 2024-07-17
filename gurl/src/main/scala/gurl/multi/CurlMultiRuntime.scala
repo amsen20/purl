@@ -3,6 +3,7 @@ package multi
 
 import gurl.unsafe.libcurl.CURLM
 import gurl.unsafe._
+import gurl.logger.GLogger
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
@@ -44,7 +45,9 @@ object CurlMultiRuntime extends CurlRuntime {
 
     } finally {
       if (schedulerCleanUp != null && multiHandle != null)
+        GLogger.log("cleaning up the scheduler")
         schedulerCleanUp()
+        GLogger.log("done cleaning up the scheduler")
 
       val code =
         if multiHandle != null then libcurl.curl_multi_cleanup(multiHandle) else CURLMcode(0)

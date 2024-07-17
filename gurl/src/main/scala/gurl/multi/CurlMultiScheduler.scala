@@ -1,6 +1,7 @@
 package gurl
 package multi
 
+import gurl.logger.GLogger
 import gurl.CurlError
 import gurl.unsafe._
 
@@ -41,9 +42,11 @@ final private[gurl] class CurlMultiScheduler(
     */
   def loop(): Unit =
     while (synchronized(running)) {
+      GLogger.log("looping...")
       try poll(Duration.Inf)
       catch {
         case e =>
+          GLogger.log("exception caught %s".format(e.getMessage()))
           synchronized:
             running = false
             reason = Some(e)
@@ -53,6 +56,7 @@ final private[gurl] class CurlMultiScheduler(
         // Remove handles that are already deleted
         // from the list of callbacks, but they are still
         // (must be) in the multi handle.
+        GLogger.log("cleaning up removed handles...")
         removedHandles.foreach(handle =>
           val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
           if code.isError then throw CurlError.fromMCode(code)
@@ -63,6 +67,7 @@ final private[gurl] class CurlMultiScheduler(
 
         // Add new handles to the multi handle from
         // the callback buffer.
+        GLogger.log("adding handles...")
         while (callbacks.size < maxConcurrentConnections && callbacksBuffer.nonEmpty) {
           val (handle, cb) = callbacksBuffer.head
           callbacksBuffer.remove(handle)
@@ -73,9 +78,12 @@ final private[gurl] class CurlMultiScheduler(
             throw CurlError.fromMCode(code)
         }
     }
+
+    GLogger.log("cleaning up...")
     cleanUp()
 
   def poll(timeout: Duration): Boolean = {
+
     val timeoutIsInf = timeout == Duration.Inf
     val noCallbacks = synchronized(callbacks.isEmpty)
 
@@ -85,7 +93,7 @@ final private[gurl] class CurlMultiScheduler(
         if (timeoutIsInf) Int.MaxValue else timeout.toMillis.min(Int.MaxValue).toInt
 
       if (timeout > Duration.Zero) {
-
+        GLogger.log("entering polling...")
         val pollCode = libcurl.curl_multi_poll(
           multiHandle,
           null,
@@ -93,6 +101,7 @@ final private[gurl] class CurlMultiScheduler(
           timeoutMillis,
           null,
         )
+        GLogger.log("waken up from polling...")
 
         if (pollCode.isError)
           throw CurlError.fromMCode(pollCode)
@@ -101,18 +110,24 @@ final private[gurl] class CurlMultiScheduler(
       if (noCallbacks) false
       else {
         val runningHandles = stackalloc[CInt]()
+
+        GLogger.log("performing...")
         val performCode = libcurl.curl_multi_perform(multiHandle, runningHandles)
 
         if (performCode.isError)
           throw CurlError.fromMCode(performCode)
+        GLogger.log("successfully performed")
 
         while ({
+          GLogger.log("looking for messages...")
           val msgsInQueue = stackalloc[CInt]()
           val info = libcurl.curl_multi_info_read(multiHandle, msgsInQueue)
 
           if (info != null && synchronized(running)) {
+            GLogger.log("a new message!")
             val curMsg = libcurl.curl_CURLMsg_msg(info)
             if (curMsg == libcurl_const.CURLMSG_DONE) {
+              GLogger.log("a request is done!")
               val handle = libcurl.curl_CURLMsg_easy_handle(info)
               synchronized:
                 callbacks.remove(handle).foreach { cb =>
@@ -126,7 +141,9 @@ final private[gurl] class CurlMultiScheduler(
                 val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
                 if (code.isError)
                   throw CurlError.fromMCode(code)
+                GLogger.log("removed the handle from the multi handle")
                 libcurl.curl_easy_cleanup(handle)
+                GLogger.log("cleaned up the easy handle")
                 // Should deletes the handle from removed list,
                 // because if the list is in the list then, the callback
                 // is removed so it is not called and now here, the handle
@@ -143,15 +160,22 @@ final private[gurl] class CurlMultiScheduler(
   }
 
   def stop(): Unit =
+    GLogger.log("stopping the scheduler...")
     synchronized:
       if (!running) return // already stopped
+      GLogger.log("the scheduler is running")
 
       running = false
+      GLogger.log("set running to false")
       reason = Some(new RuntimeException("CurlMultiScheduler is not running anymore"))
 
+      GLogger.log("waking up the poller thread...")
       val code = libcurl.curl_multi_wakeup(multiHandle)
       if (code.isError)
         throw CurlError.fromMCode(code)
+      GLogger.log("wake up signal sent")
+
+    GLogger.log("done stopping the scheduler!")
 
   override def addHandle(handle: Ptr[libcurl.CURL], cb: Option[Throwable] => Unit): Unit =
     synchronized:
@@ -184,16 +208,27 @@ final private[gurl] class CurlMultiScheduler(
   override def keepTrack(obj: Object): Unit =
     gcRoot.addRoot(obj)
 
+  override def monitorProgress(
+      dltotal: CLongLong,
+      dlnow: CLongLong,
+      ultotal: CLongLong,
+      ulnow: CLongLong,
+  ): CInt =
+    if (!synchronized(running)) 1
+    else 0
+
   /** Cleans up all the easy handles
     */
   def cleanUp(): Unit =
     // Inform their callbacks that the
     // polling is stopped.
+    GLogger.log("informing callbacks...")
     (callbacks ++ callbacksBuffer).foreach(_._2(reason))
 
     // Remove the handles from multi handle for
     // terminating all connections and cleaning multi handle
     // peacefully.
+    GLogger.log("cleaning up handles...")
     (callbacks.map(_._1) ++ removedHandles).foreach { case handle =>
       val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
       if (code.isError)
