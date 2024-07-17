@@ -4,7 +4,7 @@ package logger
 // TODO:
 // - Add multiple log levels
 // - Add a way to log to a file
-inline val enableLogging = true
+inline val enableLogging = false
 
 private[gurl] object GLogger:
   inline def log(msg: String): Unit =
