@@ -20,6 +20,12 @@ abstract class CurlRuntimeContext {
     */
   def removeHandle(handle: Ptr[libcurl.CURL]): Unit = ???
 
+  /** Get a new handle from the runtime context.
+    *
+    * @return An unsafe pointer to a CURL handle
+    */
+  def getNewHandle(): Ptr[libcurl.CURL] = ???
+
   /** Make it possible to keep track of some objects
     * so that they are reachable as long as they are reachable
     * from the runtime context.
@@ -38,5 +44,24 @@ abstract class CurlRuntimeContext {
       dlnow: CLongLong,
       ultotal: CLongLong,
       ulnow: CLongLong,
+  ): CInt = ???
+
+  /** Informs the runtime to expect an event
+    * for a specific socket.
+    *
+    * @return 0 always
+    */
+  def expectSocket(
+      easy: Ptr[libcurl.CURL],
+      socketFd: CInt,
+      what: CInt,
+  ): CInt = ???
+
+  /** Informs the runtime to expect a timer event
+    *
+    * @return 0 always
+    */
+  def expectTimer(
+      timeout_ms: CLong
   ): CInt = ???
 }

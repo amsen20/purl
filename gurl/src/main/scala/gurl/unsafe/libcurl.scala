@@ -34,6 +34,11 @@ private[gurl] object libcurl_const {
   final val CURLOPT_NOSIGNAL = CURLOPTTYPE_LONG + 99
   final val CURLOPT_NOPROGRESS = CURLOPTTYPE_LONG + 43
 
+  final val CURLMOPT_SOCKETFUNCTION = CURLOPTTYPE_FUNCTIONPOINT + 1
+  final val CURLMOPT_SOCKETDATA = CURLOPTTYPE_OBJECTPOINT + 2
+  final val CURLMOPT_TIMERFUNCTION = CURLOPTTYPE_FUNCTIONPOINT + 4
+  final val CURLMOPT_TIMERDATA = CURLOPTTYPE_OBJECTPOINT + 5
+
   final val CURL_HTTP_VERSION_NONE = 0L
   final val CURL_HTTP_VERSION_1_0 = 1L
   final val CURL_HTTP_VERSION_1_1 = 2L
@@ -69,6 +74,12 @@ private[gurl] object libcurl_const {
   final val CURL_CSELECT_IN = 0x01
   final val CURL_CSELECT_OUT = 0x02
   final val CURL_CSELECT_ERR = 0x04
+
+  // socket function callback events
+  final val CURL_POLL_IN = 1
+  final val CURL_POLL_OUT = 2
+  final val CURL_POLL_INOUT = 3
+  final val CURL_POLL_REMOVE = 4
 
   final val CURL_SOCKET_BAD = -1
   final val CURL_SOCKET_TIMEOUT = CURL_SOCKET_BAD
@@ -114,6 +125,10 @@ private[gurl] object libcurl {
 
   type progress_callback = CFuncPtr5[Ptr[Byte], CLongLong, CLongLong, CLongLong, CLongLong, CInt]
 
+  type socket_callback = CFuncPtr5[Ptr[CURL], CInt, CInt, Ptr[Byte], Ptr[Byte], CInt]
+
+  type timer_callback = CFuncPtr3[Ptr[CURLM], CLong, Ptr[Byte], CInt]
+
   type curl_ws_frame = CStruct4[CInt, CInt, Long, Long] // age, flags, offset, bytesleft
 
   def curl_version(): Ptr[CChar] = extern
@@ -157,6 +172,34 @@ private[gurl] object libcurl {
 
   def curl_multi_info_read(multi_handle: Ptr[CURLM], msgs_in_queue: Ptr[CInt]): Ptr[CURLMsg] =
     extern
+
+  @name("curl_multi_setopt")
+  def curl_multi_setopt_socket_function(
+      multi_handle: Ptr[CURLM],
+      option: CURLMOPT_SOCKETFUNCTION.type,
+      socket_callback: socket_callback,
+  ): CURLMcode = extern
+
+  @name("curl_multi_setopt")
+  def curl_multi_setopt_socket_data(
+      multi_handle: Ptr[CURLM],
+      option: CURLMOPT_SOCKETDATA.type,
+      pointer: Ptr[Byte],
+  ): CURLMcode = extern
+
+  @name("curl_multi_setopt")
+  def curl_multi_setopt_timer_function(
+      multi_handle: Ptr[CURLM],
+      option: CURLMOPT_TIMERFUNCTION.type,
+      timer_callback: timer_callback,
+  ): CURLMcode = extern
+
+  @name("curl_multi_setopt")
+  def curl_multi_setopt_timer_data(
+      multi_handle: Ptr[CURLM],
+      option: CURLMOPT_TIMERDATA.type,
+      pointer: Ptr[Byte],
+  ): CURLMcode = extern
 
   @name("org_http4s_curl_CURLMsg_msg")
   def curl_CURLMsg_msg(curlMsg: Ptr[CURLMsg]): CURLMSG = extern
@@ -346,6 +389,8 @@ private[gurl] object libcurl {
   def curl_easy_ws_meta(
       curl: Ptr[CURL]
   ): Ptr[curl_ws_frame] = extern
+
+  def curl_easy_reset(curl: Ptr[CURL]): Unit = extern
 
   def curl_slist_append(list: Ptr[curl_slist], string: Ptr[CChar]): Ptr[curl_slist] = extern
 

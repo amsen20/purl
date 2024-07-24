@@ -108,12 +108,10 @@ final private[gurl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[
 object CurlEasy {
   final private val CURL_ERROR_SIZE = 256L
 
-  def withEasy[T](body: CurlRuntimeContext ?=> CurlEasy => T)(using CurlRuntimeContext): T =
+  def withEasy[T](body: CurlRuntimeContext ?=> CurlEasy => T)(using cc: CurlRuntimeContext): T =
     // Handle cleanup should be done by either the scheduler
     // or appended to this cleanUp function
-    val handle: Ptr[CURL] = curl_easy_init()
-    if (handle == null)
-      throw new RuntimeException("curl_easy_init")
+    val handle = cc.getNewHandle()
 
     val zone: Zone = Zone.open()
     try {
