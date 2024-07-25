@@ -10,7 +10,7 @@ import scala.collection.mutable._
 
 import epollImplicits._
 
-case class WaitEvent(fd: Int, events: Int)
+case class WaitEvent(fd: Int, events: EpollEvents)
 
 class Epoll(epollFd: Int, maxEvents: Int)(using Zone) {
 
@@ -20,7 +20,7 @@ class Epoll(epollFd: Int, maxEvents: Int)(using Zone) {
 
   def initDummyPipe(): Unit =
     if pipe(dummyPipeFds) != 0 then throw EpollCreateError()
-    addFd(dummyPipeFds(0), epoll.EPOLLIN)
+    addFd(dummyPipeFds(0), EpollInputEvents().wakeUp().input())
 
   initDummyPipe()
 
@@ -29,8 +29,8 @@ class Epoll(epollFd: Int, maxEvents: Int)(using Zone) {
   // the events array used for epoll_wait
   val evs = alloc[epoll.epoll_event](maxEvents)
 
-  private def epollCtl(fd: Int, what: Int, op: Int): Unit =
-    ev.events = op.toUInt
+  private def epollCtl(fd: Int, what: Int, op: EpollEvents): Unit =
+    ev.events = op.getMask().toUInt
     ev.data = fd.toPtr[Byte]
 
     // TODO check the fd flags
@@ -41,14 +41,14 @@ class Epoll(epollFd: Int, maxEvents: Int)(using Zone) {
           case epoll.EPOLL_CTL_DEL => "delete"
         } fd: ${fd} from epoll")
 
-  def addFd(fd: Int, op: Int): Unit =
+  def addFd(fd: Int, op: EpollEvents): Unit =
     epollCtl(fd, epoll.EPOLL_CTL_ADD, op)
 
-  def modifyFd(fd: Int, op: Int): Unit =
+  def modifyFd(fd: Int, op: EpollEvents): Unit =
     epollCtl(fd, epoll.EPOLL_CTL_MOD, op)
 
   def removeFd(fd: Int): Unit =
-    epollCtl(fd, epoll.EPOLL_CTL_DEL, 0)
+    epollCtl(fd, epoll.EPOLL_CTL_DEL, EpollEvents())
 
   def wait(timeout: Int): List[WaitEvent] =
     val nfds = epoll.epoll_wait(epollFd, evs, maxEvents, timeout)
@@ -61,7 +61,7 @@ class Epoll(epollFd: Int, maxEvents: Int)(using Zone) {
       if curFd == dummyPipeFds(0) then
         // drain the dummy pipe
         read(dummyPipeFds(0), dummyBuf, 1.toCSize)
-      else waitEvents += WaitEvent(curFd, curEvents)
+      else waitEvents += WaitEvent(curFd, EpollEvents.fromMask(curEvents))
 
     waitEvents.toList
 

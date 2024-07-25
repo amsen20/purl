@@ -29,7 +29,15 @@ private[epoll] object epoll {
   final val EPOLL_CTL_MOD = 3
 
   final val EPOLLIN = 0x001
+  final val EPOLLPRI = 0x002
   final val EPOLLOUT = 0x004
+  final val EPOLLERR = 0x008
+  final val EPOLLHUP = 0x010
+  final val EPOLLRDHUP = 0x2000
+
+  
+  final val EPOLLEXCLUSIVE = 1 << 28
+  final val EPOLLWAKEUP = 1 << 29
   final val EPOLLONESHOT = 1 << 30
   final val EPOLLET = 1 << 31
 
