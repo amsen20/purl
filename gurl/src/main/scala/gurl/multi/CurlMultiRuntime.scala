@@ -5,6 +5,8 @@ import gurl.unsafe.libcurl.CURLM
 import gurl.unsafe._
 import gurl.logger.GLogger
 
+import epoll.Epoll
+
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.scalanative.unsafe._
@@ -23,37 +25,39 @@ object CurlMultiRuntime extends CurlRuntime {
     var scheduler: CurlMultiScheduler = null
     var schedulerCleanUp: () => Unit = null
 
-    try {
-      val initCode = libcurl.curl_global_init(2)
-      if (initCode.isError)
-        throw CurlError.fromCode(initCode)
+    Epoll(): epoll =>
+      try {
+        val initCode = libcurl.curl_global_init(2)
+        if (initCode.isError)
+          throw CurlError.fromCode(initCode)
 
-      multiHandle = libcurl.curl_multi_init()
-      if (multiHandle == null)
-        throw new RuntimeException("curl_multi_init")
+        multiHandle = libcurl.curl_multi_init()
+        if (multiHandle == null)
+          throw new RuntimeException("curl_multi_init")
 
-      val schedulerShutDown =
-        CurlMultiScheduler.getWithCleanUp(
-          multiHandle,
-          maxConcurrentConnections,
-          maxConnections,
-        )
-      scheduler = schedulerShutDown._1
-      schedulerCleanUp = schedulerShutDown._2
+        val schedulerShutDown =
+          CurlMultiScheduler.getWithCleanUp(
+            multiHandle,
+            epoll,
+            maxConcurrentConnections,
+            maxConnections,
+          )
+        scheduler = schedulerShutDown._1
+        schedulerCleanUp = schedulerShutDown._2
 
-      body(using scheduler)
+        body(using scheduler)
 
-    } finally {
-      if (schedulerCleanUp != null && multiHandle != null)
-        GLogger.log("cleaning up the scheduler")
-        schedulerCleanUp()
-        GLogger.log("done cleaning up the scheduler")
+      } finally {
+        if (schedulerCleanUp != null && multiHandle != null)
+          GLogger.log("cleaning up the scheduler")
+          schedulerCleanUp()
+          GLogger.log("done cleaning up the scheduler")
 
-      val code =
-        if multiHandle != null then libcurl.curl_multi_cleanup(multiHandle) else CURLMcode(0)
+        val code =
+          if multiHandle != null then libcurl.curl_multi_cleanup(multiHandle) else CURLMcode(0)
 
-      if (multiHandle != null && code.isError)
-        throw CurlError.fromMCode(code)
-      libcurl.curl_global_cleanup()
-    }
+        if (multiHandle != null && code.isError)
+          throw CurlError.fromMCode(code)
+        libcurl.curl_global_cleanup()
+      }
 }

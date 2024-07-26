@@ -18,19 +18,20 @@ class Epoll(epollFd: Int, maxEvents: Int)(using Zone) {
   val dummyPipeFds = alloc[Int](2)
   val dummyBuf = alloc[Byte](1)
 
+  // the event object used for epoll_ctl
+  val ev = alloc[epoll.epoll_event]()
+  // the events array used for epoll_wait
+  val evs = alloc[epoll.epoll_event](maxEvents)
+
   def initDummyPipe(): Unit =
     if pipe(dummyPipeFds) != 0 then throw EpollCreateError()
     addFd(dummyPipeFds(0), EpollInputEvents().wakeUp().input())
 
   initDummyPipe()
 
-  // the event object used for epoll_ctl
-  val ev = alloc[epoll.epoll_event]()
-  // the events array used for epoll_wait
-  val evs = alloc[epoll.epoll_event](maxEvents)
-
   private def epollCtl(fd: Int, what: Int, op: EpollEvents): Unit =
-    ev.events = op.getMask().toUInt
+    val msk = op.getMask()
+    ev.events = msk.toUInt
     ev.data = fd.toPtr[Byte]
 
     // TODO check the fd flags
@@ -50,7 +51,7 @@ class Epoll(epollFd: Int, maxEvents: Int)(using Zone) {
   def removeFd(fd: Int): Unit =
     epollCtl(fd, epoll.EPOLL_CTL_DEL, EpollEvents())
 
-  def wait(timeout: Int): List[WaitEvent] =
+  def waitForEvents(timeout: Int): (List[WaitEvent], Boolean) =
     val nfds = epoll.epoll_wait(epollFd, evs, maxEvents, timeout)
     if nfds < 0 then throw EpollWaitError()
     val waitEvents = ListBuffer.empty[WaitEvent]
@@ -63,7 +64,7 @@ class Epoll(epollFd: Int, maxEvents: Int)(using Zone) {
         read(dummyPipeFds(0), dummyBuf, 1.toCSize)
       else waitEvents += WaitEvent(curFd, EpollEvents.fromMask(curEvents))
 
-    waitEvents.toList
+    (waitEvents.toList, nfds == 0)
 
   def wakeUp(): Unit =
     write(dummyPipeFds(1), dummyBuf, 1.toCSize)
@@ -76,6 +77,5 @@ object Epoll {
       if epollFd < 0 then throw EpollCreateError()
       try
         body(new Epoll(epollFd, maxEvents))
-      finally
-        close(epollFd)
+      finally close(epollFd)
 }

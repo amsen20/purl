@@ -1,12 +1,14 @@
 package epoll
 
+import scala.scalanative.unsigned._
+
 class EpollEvents {
-  private var isInput = false
-  private var isOutput = false
-  private var isError = false
-  private var isPri = false
-  private var isReadingHangUp = false
-  private var isHangUp = false
+  var isInput = false
+  var isOutput = false
+  var isError = false
+  var isPri = false
+  var isReadingHangUp = false
+  var isHangUp = false
 
   def input(): EpollEvents =
     isInput = true
@@ -32,20 +34,20 @@ class EpollEvents {
     isPri = true
     this
 
-  private[epoll] def getMask(): Int =
-    var mask = 0
+  def getMask(): UInt =
+    var mask = 0L
     if isInput then mask |= epoll.EPOLLIN
     if isOutput then mask |= epoll.EPOLLOUT
     if isError then mask |= epoll.EPOLLERR
     if isPri then mask |= epoll.EPOLLPRI
     if isReadingHangUp then mask |= epoll.EPOLLHUP
     if isHangUp then mask |= epoll.EPOLLRDHUP
-    mask
+    mask.toUInt
 
 }
 
 object EpollEvents:
-  private[epoll] def fromMask(mask: Int): EpollEvents =
+  def fromMask(mask: Int): EpollEvents =
     val ret = EpollEvents()
     if (mask & epoll.EPOLLIN) > 0 then ret.isInput = true
     if (mask & epoll.EPOLLOUT) > 0 then ret.isOutput = true
@@ -57,10 +59,10 @@ object EpollEvents:
     ret
 
 class EpollInputEvents extends EpollEvents:
-  private var isEdgeTriggered = false
-  private var isOneShot = false
-  private var isWakeUp = false
-  private var isExclusive = false
+  var isEdgeTriggered = false
+  var isOneShot = false
+  var isWakeUp = false
+  var isExclusive = false
 
   def edgeTriggered(): EpollInputEvents =
     isEdgeTriggered = true
@@ -78,10 +80,11 @@ class EpollInputEvents extends EpollEvents:
     isExclusive = true
     this
 
-  override private[epoll] def getMask(): Int =
-    var mask = super.getMask()
+  override def getMask(): UInt =
+    var mask = super.getMask().toLong
     if isEdgeTriggered then mask |= epoll.EPOLLET
     if isOneShot then mask |= epoll.EPOLLONESHOT
     if isWakeUp then mask |= epoll.EPOLLWAKEUP
     if isExclusive then mask |= epoll.EPOLLEXCLUSIVE
-    mask
+
+    mask.toUInt
