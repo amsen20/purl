@@ -14,7 +14,7 @@ class WebCrawler(using curlRuntimeContext: CurlRuntimeContext) extends WebCrawle
   override def getWebContent(url: String)(using Async): Option[String] =
     CurlRequest(
       SimpleRequest(
-        HttpVersion.V1_0,
+        HttpVersion.V2,
         HttpMethod.GET,
         List(),
         url,

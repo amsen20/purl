@@ -3,6 +3,7 @@ package unsafe
 
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
+import scala.scalanative.posix.sys.select
 
 import libcurl_const._
 
@@ -24,11 +25,19 @@ private[gurl] object libcurl_const {
   final val CURLOPT_WRITEDATA = CURLOPTTYPE_OBJECTPOINT + 1
   final val CURLOPT_READFUNCTION = CURLOPTTYPE_FUNCTIONPOINT + 12
   final val CURLOPT_READDATA = CURLOPTTYPE_OBJECTPOINT + 9
+  final val CURLOPT_XFERINFOFUNCTION = CURLOPTTYPE_FUNCTIONPOINT + 219
+  final val CURLOPT_XFERINFODATA = CURLOPTTYPE_OBJECTPOINT + 57
   final val CURLOPT_ERRORBUFFER = CURLOPTTYPE_OBJECTPOINT + 10
   final val CURLOPT_VERBOSE = CURLOPTTYPE_LONG + 41
   final val CURLOPT_UPLOAD = CURLOPTTYPE_LONG + 46
   final val CURLOPT_WS_OPTIONS = CURLOPTTYPE_LONG + 320
   final val CURLOPT_NOSIGNAL = CURLOPTTYPE_LONG + 99
+  final val CURLOPT_NOPROGRESS = CURLOPTTYPE_LONG + 43
+
+  final val CURLMOPT_SOCKETFUNCTION = CURLOPTTYPE_FUNCTIONPOINT + 1
+  final val CURLMOPT_SOCKETDATA = CURLOPTTYPE_OBJECTPOINT + 2
+  final val CURLMOPT_TIMERFUNCTION = CURLOPTTYPE_FUNCTIONPOINT + 4
+  final val CURLMOPT_TIMERDATA = CURLOPTTYPE_OBJECTPOINT + 5
 
   final val CURL_HTTP_VERSION_NONE = 0L
   final val CURL_HTTP_VERSION_1_0 = 1L
@@ -60,6 +69,20 @@ private[gurl] object libcurl_const {
 
   // websocket options flags
   final val CURLWS_RAW_MODE = 1 << 0
+
+  // select constants
+  final val CURL_CSELECT_IN = 0x01
+  final val CURL_CSELECT_OUT = 0x02
+  final val CURL_CSELECT_ERR = 0x04
+
+  // socket function callback events
+  final val CURL_POLL_IN = 1
+  final val CURL_POLL_OUT = 2
+  final val CURL_POLL_INOUT = 3
+  final val CURL_POLL_REMOVE = 4
+
+  final val CURL_SOCKET_BAD = -1
+  final val CURL_SOCKET_TIMEOUT = CURL_SOCKET_BAD
 }
 
 final private[gurl] case class CURLcode(value: CInt) extends AnyVal {
@@ -88,6 +111,8 @@ private[gurl] object libcurl {
 
   type CURLversion = CUnsignedInt
 
+  type curl_socket_t = CInt
+
   type curl_slist
 
   type curl_version_info_data
@@ -97,6 +122,12 @@ private[gurl] object libcurl {
   type write_callback = CFuncPtr4[Ptr[CChar], CSize, CSize, Ptr[Byte], CSize]
 
   type read_callback = CFuncPtr4[Ptr[CChar], CSize, CSize, Ptr[Byte], CSize]
+
+  type progress_callback = CFuncPtr5[Ptr[Byte], CLongLong, CLongLong, CLongLong, CLongLong, CInt]
+
+  type socket_callback = CFuncPtr5[Ptr[CURL], CInt, CInt, Ptr[Byte], Ptr[Byte], CInt]
+
+  type timer_callback = CFuncPtr3[Ptr[CURLM], CLong, Ptr[Byte], CInt]
 
   type curl_ws_frame = CStruct4[CInt, CInt, Long, Long] // age, flags, offset, bytesleft
 
@@ -122,10 +153,53 @@ private[gurl] object libcurl {
 
   def curl_multi_wakeup(multi_handle: Ptr[CURLM]): CURLMcode = extern
 
+  def curl_multi_fdset(
+      multi_handle: Ptr[CURLM],
+      read_fd_set: Ptr[select.fd_set],
+      write_fd_set: Ptr[select.fd_set],
+      exc_fd_set: Ptr[select.fd_set],
+      max_fd: Ptr[CInt],
+  ): CURLMcode = extern
+
   def curl_multi_perform(multi_handle: Ptr[CURLM], running_handles: Ptr[CInt]): CURLMcode = extern
+
+  def curl_multi_socket_action(
+      multi_handle: Ptr[CURLM],
+      sockfd: curl_socket_t,
+      ev_bitmask: CInt,
+      running_handles: Ptr[CInt],
+  ): CURLMcode = extern
 
   def curl_multi_info_read(multi_handle: Ptr[CURLM], msgs_in_queue: Ptr[CInt]): Ptr[CURLMsg] =
     extern
+
+  @name("curl_multi_setopt")
+  def curl_multi_setopt_socket_function(
+      multi_handle: Ptr[CURLM],
+      option: CURLMOPT_SOCKETFUNCTION.type,
+      socket_callback: socket_callback,
+  ): CURLMcode = extern
+
+  @name("curl_multi_setopt")
+  def curl_multi_setopt_socket_data(
+      multi_handle: Ptr[CURLM],
+      option: CURLMOPT_SOCKETDATA.type,
+      pointer: Ptr[Byte],
+  ): CURLMcode = extern
+
+  @name("curl_multi_setopt")
+  def curl_multi_setopt_timer_function(
+      multi_handle: Ptr[CURLM],
+      option: CURLMOPT_TIMERFUNCTION.type,
+      timer_callback: timer_callback,
+  ): CURLMcode = extern
+
+  @name("curl_multi_setopt")
+  def curl_multi_setopt_timer_data(
+      multi_handle: Ptr[CURLM],
+      option: CURLMOPT_TIMERDATA.type,
+      pointer: Ptr[Byte],
+  ): CURLMcode = extern
 
   @name("org_http4s_curl_CURLMsg_msg")
   def curl_CURLMsg_msg(curlMsg: Ptr[CURLMsg]): CURLMSG = extern
@@ -232,6 +306,22 @@ private[gurl] object libcurl {
     extern
 
   @name("curl_easy_setopt")
+  def curl_easy_setopt_xferinfofunction(
+      curl: Ptr[CURL],
+      option: CURLOPT_XFERINFOFUNCTION.type,
+      progress_callback: progress_callback,
+  ): CURLcode =
+    extern
+
+  @name("curl_easy_setopt")
+  def curl_easy_setopt_xferinfodata(
+      curl: Ptr[CURL],
+      option: CURLOPT_XFERINFODATA.type,
+      pointer: Ptr[Byte],
+  ): CURLcode =
+    extern
+
+  @name("curl_easy_setopt")
   def curl_easy_setopt_upload(
       curl: Ptr[CURL],
       option: CURLOPT_UPLOAD.type,
@@ -252,6 +342,14 @@ private[gurl] object libcurl {
       curl: Ptr[CURL],
       option: CURLOPT_ERRORBUFFER.type,
       buffer: Ptr[CChar],
+  ): CURLcode =
+    extern
+
+  @name("curl_easy_setopt")
+  def curl_easy_setopt_noprogress(
+      curl: Ptr[CURL],
+      option: CURLOPT_NOPROGRESS.type,
+      value: CLong,
   ): CURLcode =
     extern
 
@@ -291,6 +389,8 @@ private[gurl] object libcurl {
   def curl_easy_ws_meta(
       curl: Ptr[CURL]
   ): Ptr[curl_ws_frame] = extern
+
+  def curl_easy_reset(curl: Ptr[CURL]): Unit = extern
 
   def curl_slist_append(list: Ptr[curl_slist], string: Ptr[CChar]): Ptr[curl_slist] = extern
 
