@@ -8,11 +8,10 @@ import gurl.unsafe.libcurl_const
 import gurl.unsafe.CURLcode
 
 import scala.scalanative.unsafe._
-import gears.async.Async
 import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
-import java.util.concurrent.CancellationException
+import scala.collection.mutable.ArrayBuffer
 
 object CurlRequest {
   private def setup(
@@ -65,38 +64,46 @@ object CurlRequest {
     cc.addHandle(handle.curl, recvData.onTerminated)
   }
 
-  def apply(req: SimpleRequest)(using CurlRuntimeContext)(using Async): Try[SimpleResponse] =
+  def apply(req: SimpleRequest)(onResponse: Try[SimpleResponse] => Unit)(using
+      cc: CurlRuntimeContext
+  ): Unit =
+    val cleanUps = ArrayBuffer.empty[() => Unit]
+
     try
-      CurlEasy.withEasy { handle =>
-        val sendData = RequestSend(req.body)
-        val recvData = RequestRecv()
-        val progressData = RequestProgress()
-        Zone:
-          CurlSList.withSList(headers =>
-            req.headers.foreach(headers.append(_))
-            try {
-              setup(
-                handle,
-                sendData,
-                recvData,
-                progressData,
-                req.httpVersion.toString,
-                req.method.toString,
-                headers,
-                req.uri,
-              )
-              recvData.response()
-            } catch {
-              case e: Throwable =>
-                val cc = summon[CurlRuntimeContext]
-                cc.removeHandle(handle.curl)
-                throw e
-            }
-          )
-      }
+      val (handle, handleCleanedUp) = CurlEasy.getEasy()
+      cleanUps.addOne(handleCleanedUp)
+      cleanUps.addOne(() => cc.removeHandle(handle.curl))
+
+      val (headers, slistCleanedUp) = CurlSList.getSList()
+      cleanUps.addOne(slistCleanedUp)
+
+      req.headers.foreach(headers.append(_))
+
+      val zone = Zone.open()
+      cleanUps.addOne(() => zone.close())
+
+      val sendData = RequestSend(req.body)
+      val progressData = RequestProgress()
+      val recvData = RequestRecv(res =>
+        cleanUps.foreach(_())
+        onResponse(res)
+      )
+
+      given Zone = zone
+      setup(
+        handle,
+        sendData,
+        recvData,
+        progressData,
+        req.httpVersion.toString,
+        req.method.toString,
+        headers,
+        req.uri,
+      )
+
     catch {
-      case e: CancellationException =>
-        throw e
-      case e: Throwable => Failure(e)
+      case e: Throwable =>
+        cleanUps.foreach(_())
+        onResponse(Failure(e))
     }
 }

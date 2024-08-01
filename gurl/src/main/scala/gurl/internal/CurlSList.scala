@@ -26,8 +26,8 @@ final private[gurl] class CurlSList(private[gurl] var list: Ptr[curl_slist]) {
   * the curl_slist.
   */
 private[gurl] object CurlSList {
-  def withSList[T](body: CurlSList => T): T =
+  def getSList(): (CurlSList, () => Unit) =
     val slist: CurlSList = CurlSList(list = null)
-    try body(slist)
-    finally if slist != null && slist.list != null then curl_slist_free_all(slist.list)
+
+    (slist, () => if slist != null && slist.list != null then curl_slist_free_all(slist.list))
 }
