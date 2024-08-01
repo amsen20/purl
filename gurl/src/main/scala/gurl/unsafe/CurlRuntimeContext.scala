@@ -64,4 +64,9 @@ abstract class CurlRuntimeContext {
   def expectTimer(
       timeout_ms: CLong
   ): CInt = ???
+
+  /** Waits until any request has a response or the timeout is reached.
+    */
+  def waitUntil(timeout: Long): Unit = ???
+
 }

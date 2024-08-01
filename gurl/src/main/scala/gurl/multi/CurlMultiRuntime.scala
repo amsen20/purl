@@ -10,6 +10,7 @@ import epoll.Epoll
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.scalanative.unsafe._
+import scala.scalanative.posix.sched
 
 /** The runtime context for the curl multi interface
   * It allows to run multiple easy handles non-blocking and concurrently.
@@ -23,7 +24,6 @@ object CurlMultiRuntime extends CurlRuntime {
   def apply[T](maxConcurrentConnections: Int, maxConnections: Int)(body: CurlRuntimeContext ?=> T) =
     var multiHandle: Ptr[CURLM] = null
     var scheduler: CurlMultiScheduler = null
-    var schedulerCleanUp: () => Unit = null
 
     Epoll(): epoll =>
       try {
@@ -35,22 +35,19 @@ object CurlMultiRuntime extends CurlRuntime {
         if (multiHandle == null)
           throw new RuntimeException("curl_multi_init")
 
-        val schedulerShutDown =
-          CurlMultiScheduler.getWithCleanUp(
+        val scheduler =
+          CurlMultiScheduler.getScheduler(
             multiHandle,
             epoll,
             maxConcurrentConnections,
             maxConnections,
           )
-        scheduler = schedulerShutDown._1
-        schedulerCleanUp = schedulerShutDown._2
 
         body(using scheduler)
-
       } finally {
-        if (schedulerCleanUp != null && multiHandle != null)
+        if (scheduler != null && multiHandle != null)
           GLogger.log("cleaning up the scheduler")
-          schedulerCleanUp()
+          scheduler.cleanUp()
           GLogger.log("done cleaning up the scheduler")
 
         val code =
