@@ -6,7 +6,6 @@ import gurl.unsafe.libcurl_const
 import gurl.http.simple._
 import gurl.unsafe.CurlRuntimeContext
 
-import gears.async.Future
 import scalanative.unsigned._
 import scalanative.unsafe._
 import scalanative.unsigned._
@@ -15,22 +14,19 @@ import scala.util.Failure
 import scala.collection.mutable.ArrayBuffer
 import scala.scalanative.unsafe.CArray
 import scala.util.Try
-import gears.async.Async
 
 private enum HeaderLine:
   case StatusLine(version: HttpVersion, status: Int)
   case Line(content: Array[Byte])
   case CRLF
 
-final private[gurl] class RequestRecv {
+final private[gurl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
 
   // Mutable shared state.
   val responseBody: ArrayBuffer[Byte] = ArrayBuffer[Byte]()
   val responseHeaders: ArrayBuffer[HeaderLine] = ArrayBuffer[HeaderLine]()
-  val result: Future.Promise[SimpleResponse] = Future.Promise()
 
-  @inline def response()(using Async): Try[SimpleResponse] =
-    result.asFuture.awaitResult
+  @volatile var isDone = false
 
   def parseResponse(headersList: List[HeaderLine]): Try[SimpleResponse] = {
     if headersList.isEmpty then return Failure(new Exception("Empty headers"))
@@ -52,7 +48,7 @@ final private[gurl] class RequestRecv {
           case HeaderLine.Line(content) => content
         }
 
-        val responseContent = synchronized(responseBody.toArray)
+        val responseContent = responseBody.toArray
 
         Success(
           SimpleResponse(
@@ -67,10 +63,11 @@ final private[gurl] class RequestRecv {
   }
 
   @inline def onTerminated(res: Option[Throwable]): Unit =
-    if result.poll().isEmpty then
+    if !isDone then
       res match
-        case Some(e) => result.complete(Failure(e))
-        case None => result.complete(parseResponse(synchronized(responseHeaders.toList)))
+        case Some(e) => onResponse(Failure(e))
+        case None => onResponse(parseResponse(responseHeaders.toList))
+      isDone = true
 
   @inline def onWrite(
       buffer: Ptr[CChar],
@@ -78,8 +75,8 @@ final private[gurl] class RequestRecv {
       nmemb: CSize,
   ): CSize =
     val amount = size * nmemb
-    synchronized:
-      Utils.appendBufferToArrayBuffer(buffer, responseBody, amount.toInt)
+    Utils.appendBufferToArrayBuffer(buffer, responseBody, amount.toInt)
+
     amount
 
   @inline def onHeader(
@@ -98,20 +95,20 @@ final private[gurl] class RequestRecv {
           HeaderLine.StatusLine(HttpVersion.fromString(v).get, c.toInt)
         } catch {
           case e: Throwable =>
-            result.complete(Failure(e))
+            onResponse(Failure(e))
+            isDone = true
             return size * nitems
         }
       else HeaderLine.Line(content.toArray)
 
-    synchronized:
-      responseHeaders += headerLine
+    responseHeaders += headerLine
 
     size * nitems
   }
 }
 
 private[gurl] object RequestRecv {
-  def apply(): RequestRecv = new RequestRecv()
+  def apply(onResponse: Try[SimpleResponse] => Unit): RequestRecv = new RequestRecv(onResponse)
 
   private[gurl] def headerCallback(
       buffer: Ptr[CChar],
