@@ -1,7 +1,7 @@
 package crawler
 
-import gears.async.*
 import gurl.unsafe.CurlRuntimeContext
+import gurl.multi.MultiRuntimeTimeOut
 import gurl.http.*
 import gurl.http.simple.*
 
@@ -11,7 +11,7 @@ import gurl.http.simple.{HttpVersion, SimpleRequest}
 import gurl.http.CurlRequest
 
 class WebCrawler(using curlRuntimeContext: CurlRuntimeContext) extends WebCrawlerBase:
-  override def getWebContent(url: String)(using Async): Option[String] =
+  override def getWebContent(url: String, onResponse: Option[String] => Unit): Unit =
     CurlRequest(
       SimpleRequest(
         HttpVersion.V2,
@@ -20,13 +20,21 @@ class WebCrawler(using curlRuntimeContext: CurlRuntimeContext) extends WebCrawle
         url,
         "".getBytes(),
       )
-    )(using curlRuntimeContext) match
-      case Success(res) =>
-        if res.status != 200 then None
-        if !res.headers
-            .map(_.map(_.toChar).mkString)
-            .map(header => header.contains("content-type") && header.contains("text/html"))
-            .reduce(_ || _)
-        then None
-        Some(res.body.map(_.toChar).mkString)
-      case Failure(_) => None
+    )(res =>
+      res match
+        case Success(res) =>
+          if res.status != 200 then None
+          if !res.headers
+              .map(_.map(_.toChar).mkString)
+              .map(header => header.contains("content-type") && header.contains("text/html"))
+              .reduce(_ || _)
+          then None
+          onResponse(Some(res.body.map(_.toChar).mkString))
+        case Failure(e) =>
+          // e.printStackTrace()
+          onResponse(None)
+    )
+
+  override def awaitResponses(timeout: Long): Unit =
+    if timeout < 0 then throw new MultiRuntimeTimeOut()
+    curlRuntimeContext.waitUntil(timeout)
