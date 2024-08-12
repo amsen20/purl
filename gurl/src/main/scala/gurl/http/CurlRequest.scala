@@ -6,6 +6,7 @@ import gurl.unsafe.CurlRuntimeContext
 import gurl.http.simple._
 import gurl.unsafe.libcurl_const
 import gurl.unsafe.CURLcode
+import gurl.logger.GLogger
 
 import scala.scalanative.unsafe._
 import scala.util.Try
@@ -58,9 +59,6 @@ object CurlRequest {
     handle.setProgressData(Utils.toPtr(progressData))
     handle.setProgressFunction(RequestProgress.progressCallback(_, _, _, _, _))
 
-    cc.keepTrack(sendData)
-    cc.keepTrack(recvData)
-    cc.keepTrack(progressData)
     cc.addHandle(handle.curl, recvData.onTerminated)
   }
 
@@ -83,11 +81,21 @@ object CurlRequest {
       cleanUps.addOne(() => zone.close())
 
       val sendData = RequestSend(req.body)
+      cc.keepTrack(sendData)
+
       val progressData = RequestProgress()
-      val recvData = RequestRecv(res =>
+      cc.keepTrack(progressData)
+
+      val recvData: RequestRecv = RequestRecv(res =>
+        GLogger.log("I am being called")
         cleanUps.foreach(_())
+        cc.forget(sendData)
+        cc.forget(progressData)
+
         onResponse(res)
       )
+      cc.keepTrack(recvData)
+      cleanUps.addOne(() => cc.forget(recvData))
 
       given Zone = zone
       setup(

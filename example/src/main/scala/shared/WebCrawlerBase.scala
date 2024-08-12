@@ -1,17 +1,17 @@
 package shared
 
-import scala.collection.mutable
 import scala.io.Source
 import scala.util._
 import scala.math.min
 import scala.concurrent.duration
 
-import scala.collection.mutable.ListBuffer
 import scala.compiletime.ops.double
+import scala.annotation.tailrec
+import scala.collection.immutable.HashSet
 
 abstract class WebCrawlerBase {
-  val found = mutable.Set[String]()
-  val successfulExplored = mutable.Set[String]()
+  var found = HashSet[String]()
+  var successfulExplored = HashSet[String]()
 
   // Only for analysis
   var charsDownloaded = 0
@@ -22,66 +22,68 @@ abstract class WebCrawlerBase {
   def awaitResponses(timeout: Long): Unit = ???
 
   def exploreLayer(
-      seen: Set[String],
-      layer: Set[String],
+      seen: HashSet[String],
+      layer: List[String],
       maxConnections: Int,
-  ): Set[String] = {
-    val nextLayer: mutable.Set[String] = mutable.Set()
-    val layerIt = layer.iterator
-
+  ): List[String] = {
+    var nextLayer: HashSet[String] = HashSet()
     var finished = 0
     var started = 0
 
-    def goNext(onResponse: (String, Option[String]) => Unit): Unit =
-      if !layerIt.hasNext then return
-      val url = layerIt.next()
-      getWebContent(url, onResponse(url, _))
+    val onResponse = (url: String, response: Option[String]) =>
+      finished += 1
 
-    def getOnResponse =
-      started += 1
+      response match
+        case Some(content) =>
+          successfulExplored = successfulExplored + url
+          charsDownloaded += content.length
 
-      (url: String, response: Option[String]) =>
-        finished += 1
-
-        response match
-          case Some(content) =>
-            successfulExplored.add(url)
-            charsDownloaded += content.length
-
-            val links = UrlUtils.extractLinks(url, content)
-            found ++= links
-            nextLayer ++= links
-          case None => ()
-        ()
-
-    for _ <- 0 until min(maxConnections, layer.size) do goNext(getOnResponse)
+          val links = UrlUtils.extractLinks(url, content)
+          found = found ++ links
+          nextLayer = nextLayer ++ links
+        case None => ()
+      ()
 
     while finished < layer.size do
-      while started < layer.size && started - finished < maxConnections do goNext(getOnResponse)
+      while started < layer.size && started - finished < maxConnections do
+        val url = layer(started)
+        started += 1
+        getWebContent(url, onResponse(url, _))
+
       awaitResponses(deadline - System.currentTimeMillis())
     end while
 
-    nextLayer.filter(url => !seen.contains(url) && !layer.contains(url)).toSet
+    (nextLayer -- seen).toList
   }
 
+  @tailrec
+  final def crawlRecursive(
+      seen: HashSet[String],
+      layer: List[String],
+      maxConnections: Int,
+      depth: Int,
+  ): Unit =
+    if depth != 0 then
+      val nextLayer = exploreLayer(seen, layer, maxConnections)
+      crawlRecursive(
+        seen ++ nextLayer,
+        nextLayer,
+        maxConnections,
+        depth - 1,
+      )
+
   def crawl(url: String, maxConnections: Int, timeout: Long): Unit = {
-    deadline = System.currentTimeMillis() + timeout
-
-    found += url
-    val seen = mutable.Set[String]()
-    var layer = Set[String](url)
-
     /*
       TODO Make the function return a lazy list
       which returns found links one by one,
       then the maxDepth can be removed.
      */
-    val maxDepth = 1000 // if DEBUG then 2 else 1000
+    val maxDepth = 100000000 // if DEBUG then 2 else 1000
 
-    for depth <- 0 until maxDepth do
-      val nextLayer = exploreLayer(seen.toSet, layer, maxConnections)
-      seen ++= layer
-      layer = nextLayer
+    deadline = System.currentTimeMillis() + timeout
+    found = HashSet(url)
+
+    crawlRecursive(HashSet.empty, List(url), maxConnections, maxDepth)
   }
 
 }

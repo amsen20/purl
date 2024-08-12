@@ -3,12 +3,14 @@ package gurl.unsafe
 import scala.collection.mutable
 
 class GCRoot {
-  private val roots = mutable.ArrayBuffer.empty[Object]
+  private val roots = mutable.HashSet.empty[Object]
+  private var len = 0
 
-  def addRoot(obj: Object): Unit =
-    roots.addOne(obj)
+  def add(obj: Object): Unit =
+    roots.add(obj)
 
-  def removeRoot(obj: Object): Unit =
-    val ind = roots.indexOf(obj)
-    if ind >= 0 then roots.remove(ind)
+  def remove(obj: Object): Boolean =
+    roots.remove(obj)
+
+  def size: Int = len
 }

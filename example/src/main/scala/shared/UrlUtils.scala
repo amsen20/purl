@@ -1,5 +1,7 @@
 package shared
 
+import scala.collection.immutable.HashSet
+
 object UrlUtils {
   def isValidURL(url: String, baseURL: String): Boolean =
     val prefix = url.startsWith("http://") || url.startsWith("https://")
@@ -29,7 +31,7 @@ object UrlUtils {
       // absolute URL
       ifValid(noParamURL, baseURL)
 
-  def extractLinks(url: String, content: String): Set[String] =
+  def extractLinks(url: String, content: String): List[String] =
     val links = LINK_REGEX
       .findAllMatchIn(
         content
@@ -46,6 +48,5 @@ object UrlUtils {
           case None => acc
         }
       )
-      .toSet
     targetLinks
 }
