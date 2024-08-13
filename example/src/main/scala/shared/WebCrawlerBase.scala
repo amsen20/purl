@@ -23,9 +23,9 @@ abstract class WebCrawlerBase {
 
   def exploreLayer(
       seen: HashSet[String],
-      layer: List[String],
+      layer: Array[String],
       maxConnections: Int,
-  ): List[String] = {
+  ): Array[String] = {
     var nextLayer: HashSet[String] = HashSet()
     var finished = 0
     var started = 0
@@ -53,13 +53,13 @@ abstract class WebCrawlerBase {
       awaitResponses(deadline - System.currentTimeMillis())
     end while
 
-    (nextLayer -- seen).toList
+    (nextLayer -- seen).toArray
   }
 
   @tailrec
   final def crawlRecursive(
       seen: HashSet[String],
-      layer: List[String],
+      layer: Array[String],
       maxConnections: Int,
       depth: Int,
   ): Unit =
@@ -83,7 +83,7 @@ abstract class WebCrawlerBase {
     deadline = System.currentTimeMillis() + timeout
     found = HashSet(url)
 
-    crawlRecursive(HashSet.empty, List(url), maxConnections, maxDepth)
+    crawlRecursive(HashSet.empty, Array(url), maxConnections, maxDepth)
   }
 
 }
