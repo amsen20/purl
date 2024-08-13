@@ -23,8 +23,6 @@ object Experiment:
     println(s"totalChars=${crawler.charsDownloaded}")
     println(s"overheadTime=${elapsedTime - timeout}")
 
-    println("Explored links:")
-    crawler.successfulExplored.foreach(println(_))
     if DEBUG then
       println("Explored links:")
       crawler.successfulExplored.foreach(println(_))

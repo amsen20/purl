@@ -34,6 +34,13 @@ abstract class CurlRuntimeContext {
     */
   def keepTrack(obj: Object): Unit = ???
 
+  /** Forget about an object.
+    * This is useful when the object is no longer needed.
+    *
+    * @param obj
+    */
+  def forget(obj: Object): Unit = ???
+
   /** Monitors the progress of a connection.
     * For now this just abort when the scheduler is shutting down.
     *

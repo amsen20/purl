@@ -250,7 +250,12 @@ final private[gurl] class CurlMultiScheduler(
   /** Keeps track of the object to prevent it from being garbage collected
     */
   override def keepTrack(obj: Object): Unit =
-    gcRoot.addRoot(obj)
+    gcRoot.add(obj)
+
+  /** Forgets the object to allow it to be garbage collected
+    */
+  override def forget(obj: Object): Unit =
+    gcRoot.remove(obj)
 
   override def monitorProgress(
       dltotal: CLongLong,
