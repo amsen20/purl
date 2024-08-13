@@ -7,7 +7,6 @@ import gurl.logger.GLogger
 
 import epoll.Epoll
 
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.scalanative.unsafe._
 import scala.scalanative.posix.sched

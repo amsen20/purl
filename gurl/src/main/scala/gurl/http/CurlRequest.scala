@@ -25,6 +25,7 @@ object CurlRequest {
       headers: CurlSList,
       uri: String,
   )(using cc: CurlRuntimeContext, zone: Zone): Unit = {
+    GLogger.log("Setting up the request...")
     // handle.setVerbose(true)
 
     handle.setCustomRequest(toCString(method))
@@ -59,12 +60,14 @@ object CurlRequest {
     handle.setProgressData(Utils.toPtr(progressData))
     handle.setProgressFunction(RequestProgress.progressCallback(_, _, _, _, _))
 
+    GLogger.log("Done setting up the request")
     cc.addHandle(handle.curl, recvData.onTerminated)
   }
 
   def apply(req: SimpleRequest)(onResponse: Try[SimpleResponse] => Unit)(using
       cc: CurlRuntimeContext
   ): Unit =
+    GLogger.log("Creating up a request...")
     val cleanUps = ArrayBuffer.empty[() => Unit]
 
     try
@@ -114,4 +117,6 @@ object CurlRequest {
         cleanUps.foreach(_())
         onResponse(Failure(e))
     }
+
+    GLogger.log("done creating up the request")
 }
