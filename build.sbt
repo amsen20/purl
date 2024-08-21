@@ -1,22 +1,30 @@
-import Versions._
 import scalanative.build._
+import Versions._
 
 ThisBuild / tlBaseVersion := "0.1"
-ThisBuild / organization := "ca.uwaterloo.plg"
-
+ThisBuild / organization  := "ca.uwaterloo.plg"
+ThisBuild / homepage      := Some(url("https://github.com/amsen20/gurl"))
+ThisBuild / licenses      := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0"))
 ThisBuild / developers := List(
-  tlGitHubDev("amsen20", "Amirhossein Pashaeehir")
+  Developer(
+    "amsen20",
+    "Amirhossein Pashaeehir",
+    "ahph1380@gmail.com",
+    url("https://github.com/amsen20/")
+  )
 )
-ThisBuild / startYear := Some(2024)
+
+ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
+sonatypeRepository                 := "https://s01.oss.sonatype.org/service/local"
 
 ThisBuild / crossScalaVersions := Seq(scala3)
 
 val vcpkgBaseDir = "C:/vcpkg/"
-val isDebug = false
+val isDebug      = false
 
 ThisBuild / nativeConfig ~= { c =>
   val osNameOpt = sys.props.get("os.name")
-  val isMacOs = osNameOpt.exists(_.toLowerCase().contains("mac"))
+  val isMacOs   = osNameOpt.exists(_.toLowerCase().contains("mac"))
   val isWindows = osNameOpt.exists(_.toLowerCase().contains("windows"))
   var platformOptions = if (isMacOs) { // brew-installed curl
     c.withLinkingOptions(c.linkingOptions :+ "-L/usr/local/opt/curl/lib")
@@ -26,17 +34,19 @@ ThisBuild / nativeConfig ~= { c =>
   } else c
 
   platformOptions = platformOptions
-    .withMultithreading(true)
+    .withMultithreading(false)
     .withLTO(LTO.none)
-    .withMode(Mode.debug)
     .withGC(GC.immix)
   if (isDebug)
     platformOptions
       .withSourceLevelDebuggingConfig(_.enableAll) // enable generation of debug informations
-      .withOptimize(false) // disable Scala Native optimizer
-      .withMode(scalanative.build.Mode.debug) // compile using LLVM without optimizations
+      .withOptimize(false)                         // disable Scala Native optimizer
+      .withMode(scalanative.build.Mode.debug)      // compile using LLVM without optimizations
       .withCompileOptions(Seq("-DSCALANATIVE_DELIMCC_DEBUG"))
-  else platformOptions
+  else
+    platformOptions
+      .withMode(Mode.releaseFull)
+      .withOptimize(true)
 }
 
 ThisBuild / envVars ++= {
@@ -55,7 +65,7 @@ lazy val modules = List(
   testServer,
   testCommon,
   httpTestSuite,
-  multiTestSuite,
+  multiTestSuite
 )
 // For now we do not support websocket on Scala Native
 // ++ when(sys.env.get("EXPERIMENTAL").contains("yes"))(websocketTestSuite)
@@ -71,8 +81,9 @@ lazy val gurl = project
   .settings(
     name := "gurl",
     libraryDependencies ++= Seq(
-      "ch.epfl.lamp" %%% "gears" % gearsVersion
-    ),
+      "ch.epfl.lamp"     %%% "gears"      % gearsVersion,
+      "ca.uwaterloo.plg" %%% "pollerbear" % pollerBearVersion
+    )
   )
 
 lazy val example = project
@@ -90,10 +101,10 @@ lazy val testServer = project
   .enablePlugins(NoPublishPlugin)
   .settings(
     libraryDependencies ++= Seq(
-      "org.typelevel" %% "cats-effect" % catsEffectVersion,
-      "org.http4s" %% "http4s-dsl" % http4sVersion,
-      "org.http4s" %% "http4s-ember-server" % http4sVersion,
-      "ch.qos.logback" % "logback-classic" % "1.4.14",
+      "org.typelevel" %% "cats-effect"         % catsEffectVersion,
+      "org.http4s"    %% "http4s-dsl"          % http4sVersion,
+      "org.http4s"    %% "http4s-ember-server" % http4sVersion,
+      "ch.qos.logback" % "logback-classic"     % "1.4.14"
     )
   )
 
@@ -108,10 +119,10 @@ lazy val testCommon = project
   .dependsOn(gurl)
   .settings(
     libraryDependencies ++= Seq(
-      "ch.epfl.lamp" %%% "gears" % gearsVersion,
-      "org.scalameta" %%% "munit" % munitVersion % Test,
+      "ch.epfl.lamp"  %%% "gears" % gearsVersion,
+      "org.scalameta" %%% "munit" % munitVersion % Test
     ),
-    testFrameworks += new TestFramework("munit.Framework"),
+    testFrameworks += new TestFramework("munit.Framework")
   )
 
 lazy val httpTestSuite = project
@@ -120,10 +131,10 @@ lazy val httpTestSuite = project
   .dependsOn(gurl)
   .settings(
     libraryDependencies ++= Seq(
-      "ch.epfl.lamp" %%% "gears" % gearsVersion,
-      "org.scalameta" %%% "munit" % munitVersion % Test,
+      "ch.epfl.lamp"  %%% "gears" % gearsVersion,
+      "org.scalameta" %%% "munit" % munitVersion % Test
     ),
-    testFrameworks += new TestFramework("munit.Framework"),
+    testFrameworks += new TestFramework("munit.Framework")
   )
 
 lazy val multiTestSuite = project
@@ -132,14 +143,14 @@ lazy val multiTestSuite = project
   .dependsOn(gurl)
   .settings(
     libraryDependencies ++= Seq(
-      "ch.epfl.lamp" %%% "gears" % gearsVersion,
-      "org.scalameta" %%% "munit" % munitVersion % Test,
+      "ch.epfl.lamp"  %%% "gears" % gearsVersion,
+      "org.scalameta" %%% "munit" % munitVersion % Test
     ),
-    testFrameworks += new TestFramework("munit.Framework"),
+    testFrameworks += new TestFramework("munit.Framework")
   )
 
 lazy val startTestServer = taskKey[Unit]("starts test server if not running")
-lazy val stopTestServer = taskKey[Unit]("stops test server if running")
+lazy val stopTestServer  = taskKey[Unit]("stops test server if running")
 
 ThisBuild / startTestServer := {
   (testServer / Compile / compile).value
