@@ -6,7 +6,7 @@ import gurl.unsafe.CurlRuntimeContext
 import gurl.http.simple._
 import gurl.unsafe.libcurl_const
 import gurl.unsafe.CURLcode
-import gurl.logger.GLogger
+import pollerBear.logger.PBLogger
 
 import scala.scalanative.unsafe._
 import scala.util.Try
@@ -25,7 +25,7 @@ object CurlRequest {
       headers: CurlSList,
       uri: String,
   )(using cc: CurlRuntimeContext, zone: Zone): Unit = {
-    GLogger.log("Setting up the request...")
+    PBLogger.log("Setting up the request...")
     // handle.setVerbose(true)
 
     handle.setCustomRequest(toCString(method))
@@ -60,20 +60,22 @@ object CurlRequest {
     handle.setProgressData(Utils.toPtr(progressData))
     handle.setProgressFunction(RequestProgress.progressCallback(_, _, _, _, _))
 
-    GLogger.log("Done setting up the request")
+    PBLogger.log("Done setting up the request")
     cc.addHandle(handle.curl, recvData.onTerminated)
   }
 
   def apply(req: SimpleRequest)(onResponse: Try[SimpleResponse] => Unit)(using
       cc: CurlRuntimeContext
   ): Unit =
-    GLogger.log("Creating up a request...")
+    PBLogger.log("Creating up a request...")
     val cleanUps = ArrayBuffer.empty[() => Unit]
 
     try
       val (handle, handleCleanedUp) = CurlEasy.getEasy()
       cleanUps.addOne(handleCleanedUp)
-      cleanUps.addOne(() => cc.removeHandle(handle.curl))
+      cleanUps.addOne(() => 
+        cc.removeHandle(handle.curl)
+      )
 
       val (headers, slistCleanedUp) = CurlSList.getSList()
       cleanUps.addOne(slistCleanedUp)
@@ -90,7 +92,7 @@ object CurlRequest {
       cc.keepTrack(progressData)
 
       val recvData: RequestRecv = RequestRecv(res =>
-        GLogger.log("I am being called")
+        PBLogger.log("I am being called")
         cleanUps.foreach(_())
         cc.forget(sendData)
         cc.forget(progressData)
@@ -118,5 +120,5 @@ object CurlRequest {
         onResponse(Failure(e))
     }
 
-    GLogger.log("done creating up the request")
+    PBLogger.log("done creating up the request")
 }

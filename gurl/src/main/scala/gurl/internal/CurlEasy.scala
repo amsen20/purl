@@ -1,11 +1,10 @@
 package gurl
 package internal
 
-import gurl.CurlError
-import gurl.unsafe.CurlRuntimeContext
 import gurl.unsafe.libcurl._
 import gurl.unsafe.libcurl_const._
-
+import gurl.unsafe.CurlRuntimeContext
+import gurl.CurlError
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
 
@@ -91,7 +90,7 @@ final private[gurl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[
       bufLen: CSize,
       send: Ptr[CSize],
       fragsize: CSize,
-      flags: UInt,
+      flags: UInt
   ): Unit = throwOnError(curl_easy_ws_send(curl, buffer, bufLen, send, fragsize, flags))
 
   def wsMeta(): Ptr[curl_ws_frame] = curl_easy_ws_meta(curl)
@@ -99,19 +98,20 @@ final private[gurl] class CurlEasy private (val curl: Ptr[CURL], errBuffer: Ptr[
   def pause(bitmask: CInt): Unit = throwOnError(curl_easy_pause(curl, bitmask))
 }
 
-/** An structured style of using curl_easy handle.
-  * The handle can be used as the argument of the body function.
-  * It is non-blocking but synchronous.
-  * For having it async, you can wrap it in a Future.
-  */
+/**
+ * An structured style of using curl_easy handle.
+ * The handle can be used as the argument of the body function.
+ * It is non-blocking but synchronous.
+ * For having it async, you can wrap it in a Future.
+ */
 /*private[gurl]*/
 object CurlEasy {
   final private val CURL_ERROR_SIZE = 256L
 
-  def getEasy()(using
-      cc: CurlRuntimeContext
+  def getEasy()(
+      using cc: CurlRuntimeContext
   ): (CurlEasy, () => Unit) =
-    // Handle cleanup should be done by either the scheduler
+    // Handle cleanup should be done by either the curl runtime
     // or appended to this cleanUp function
     val handle = cc.getNewHandle()
 
@@ -129,4 +129,5 @@ object CurlEasy {
       case e: Throwable =>
         zone.close()
         throw e
+
 }
