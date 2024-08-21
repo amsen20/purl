@@ -8,6 +8,7 @@ import scala.concurrent.duration
 import scala.compiletime.ops.double
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
+import pollerBear.logger.PBLogger
 
 abstract class WebCrawlerBase {
   var found = HashSet[String]()
@@ -26,6 +27,7 @@ abstract class WebCrawlerBase {
       layer: Array[String],
       maxConnections: Int,
   ): Array[String] = {
+    PBLogger.log(s"Exploring layer of size ${layer.size}")
     var nextLayer: HashSet[String] = HashSet()
     var finished = 0
     var started = 0
@@ -51,6 +53,7 @@ abstract class WebCrawlerBase {
         getWebContent(url, onResponse(url, _))
 
       awaitResponses(deadline - System.currentTimeMillis())
+      PBLogger.log(s"Finished: $finished, Started: $started, Layer size: ${layer.size}")
     end while
 
     (nextLayer -- seen).toArray

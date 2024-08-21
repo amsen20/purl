@@ -1,16 +1,20 @@
 package crawler
 
-import gurl.unsafe.CurlRuntimeContext
-import gurl.multi.MultiRuntimeTimeOut
 import gurl.http.*
 import gurl.http.simple.*
-
-import shared.WebCrawlerBase
-import scala.util.*
-import gurl.http.simple.{HttpVersion, SimpleRequest}
+import gurl.http.simple.{ HttpVersion, SimpleRequest }
 import gurl.http.CurlRequest
+import gurl.unsafe.CurlRuntimeContext
+import pollerBear.runtime.Poller
+import scala.util.*
+import shared.TimeOut
+import shared.WebCrawlerBase
 
-class WebCrawler(using curlRuntimeContext: CurlRuntimeContext) extends WebCrawlerBase:
+class WebCrawler(
+    using curlRuntimeContext: CurlRuntimeContext,
+    poller: Poller
+) extends WebCrawlerBase:
+
   override def getWebContent(url: String, onResponse: Option[String] => Unit): Unit =
     CurlRequest(
       SimpleRequest(
@@ -18,7 +22,7 @@ class WebCrawler(using curlRuntimeContext: CurlRuntimeContext) extends WebCrawle
         HttpMethod.GET,
         List(),
         url,
-        "".getBytes(),
+        "".getBytes()
       )
     )(res =>
       res match
@@ -36,5 +40,5 @@ class WebCrawler(using curlRuntimeContext: CurlRuntimeContext) extends WebCrawle
     )
 
   override def awaitResponses(timeout: Long): Unit =
-    if timeout < 0 then throw new MultiRuntimeTimeOut()
-    curlRuntimeContext.waitUntil(timeout)
+    if timeout < 0 then throw new TimeOut()
+    poller.waitUntil()

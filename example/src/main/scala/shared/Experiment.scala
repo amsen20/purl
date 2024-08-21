@@ -3,14 +3,12 @@ package shared
 import scala.concurrent.duration
 import scala.concurrent.duration.FiniteDuration
 
-import gurl.multi.MultiRuntimeTimeOut
-
 object Experiment:
   def run(crawler: WebCrawlerBase, url: String, timeout: Long, maxConnections: Int): Unit =
     val startTime = System.currentTimeMillis()
 
     try crawler.crawl(url, maxConnections, timeout)
-    catch case e: MultiRuntimeTimeOut => ()
+    catch case e: TimeOut => ()
 
     val endTime = System.currentTimeMillis()
     val elapsedTime = endTime - startTime
