@@ -46,6 +46,7 @@ class CurlRequestSuite extends munit.FunSuite {
       given PassivePoller = poller
       CurlMultiRuntime:
         for statusCode <- List(404, 500) do
+          done = false
           CurlRequest(
             SimpleRequest(
               HttpVersion.V1_0,
@@ -96,7 +97,7 @@ class CurlRequestSuite extends munit.FunSuite {
     withPassivePoller { poller =>
       given PassivePoller = poller
       CurlMultiRuntime:
-        for msg <- List("a") do
+        for msg <- List("SOME_NOT_RANDOM_STRING_JRWIGJER)$%)##@R") do
           CurlRequest(
             SimpleRequest(
               HttpVersion.V1_0,
