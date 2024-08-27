@@ -1,7 +1,7 @@
-package gurl
+package purl
 
 import munit.FunSuite
-import gurl.unsafe.CurlRuntime
+import purl.unsafe.CurlRuntime
 
 class CurlRuntimeSuite extends FunSuite {
 

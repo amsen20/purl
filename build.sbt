@@ -34,7 +34,7 @@ ThisBuild / nativeConfig ~= { c =>
   } else c
 
   platformOptions = platformOptions
-    .withMultithreading(false)
+    .withMultithreading(true)
     .withLTO(LTO.none)
     .withGC(GC.immix)
   if (isDebug)
@@ -60,11 +60,9 @@ ThisBuild / envVars ++= {
 def when(pred: => Boolean)(refs: CompositeProject*) = if (pred) refs else Nil
 
 lazy val modules = List(
-  gurl,
+  purl,
   example,
   testServer,
-  testCommon,
-  httpTestSuite,
   multiTestSuite
 )
 // For now we do not support websocket on Scala Native
@@ -75,21 +73,22 @@ lazy val root =
     .enablePlugins(NoPublishPlugin)
     .aggregate(modules: _*)
 
-lazy val gurl = project
-  .in(file("gurl"))
+lazy val purl = project
+  .in(file("purl"))
   .enablePlugins(ScalaNativePlugin)
   .settings(
-    name := "gurl",
+    name := "purl",
     libraryDependencies ++= Seq(
       "ch.epfl.lamp"     %%% "gears"      % gearsVersion,
-      "ca.uwaterloo.plg" %%% "pollerbear" % pollerBearVersion
+      "ca.uwaterloo.plg" %%% "pollerbear" % pollerBearVersion,
+      "org.scalameta"    %%% "munit"      % munitVersion % Test
     )
   )
 
 lazy val example = project
   .in(file("example"))
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(gurl)
+  .dependsOn(purl)
   .settings(
     libraryDependencies ++= Seq(
       "ch.epfl.lamp" %%% "gears" % gearsVersion
@@ -108,39 +107,10 @@ lazy val testServer = project
     )
   )
 
-//NOTE
-//It's important to keep tests separated from source code,
-//so that we can prevent linking a category of tests
-//in platforms that don't support those features
-//
-lazy val testCommon = project
-  .in(file("tests/common"))
-  .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(gurl)
-  .settings(
-    libraryDependencies ++= Seq(
-      "ch.epfl.lamp"  %%% "gears" % gearsVersion,
-      "org.scalameta" %%% "munit" % munitVersion % Test
-    ),
-    testFrameworks += new TestFramework("munit.Framework")
-  )
-
-lazy val httpTestSuite = project
-  .in(file("tests/http"))
-  .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(gurl)
-  .settings(
-    libraryDependencies ++= Seq(
-      "ch.epfl.lamp"  %%% "gears" % gearsVersion,
-      "org.scalameta" %%% "munit" % munitVersion % Test
-    ),
-    testFrameworks += new TestFramework("munit.Framework")
-  )
-
 lazy val multiTestSuite = project
   .in(file("tests/multi"))
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(gurl)
+  .dependsOn(purl)
   .settings(
     libraryDependencies ++= Seq(
       "ch.epfl.lamp"  %%% "gears" % gearsVersion,

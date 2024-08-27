@@ -1,20 +1,19 @@
-package gurl
+package purl
 
-import gurl.http.simple.{HttpMethod, HttpVersion, SimpleRequest, SimpleResponse}
-import gurl.http.CurlRequest
-import gurl.unsafe.CurlRuntimeContext
-import gurl.multi.CurlMultiRuntime
-
-import scala.util.Success
-import gears.async.default.given
-import scala.concurrent.ExecutionContext
 import gears.async.*
-import scala.util.Failure
-import scala.util.Try
-import scala.annotation.static
+import gears.async.default.given
+import purl.http.simple.{ HttpMethod, HttpVersion, SimpleRequest, SimpleResponse }
+import purl.http.CurlRequest
+import purl.multi.CurlMultiRuntime
+import purl.unsafe.CurlRuntimeContext
+import purl.CurlError
 import scala.annotation.internal.requiresCapability
+import scala.annotation.static
 import scala.concurrent.duration.FiniteDuration
-import gurl.CurlError
+import scala.concurrent.ExecutionContext
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 class CurlMultiRuntimeSuite extends munit.FunSuite {
 
@@ -22,27 +21,35 @@ class CurlMultiRuntimeSuite extends munit.FunSuite {
 
   val longMsg = "a" * 1000
 
-  def postRequest(msg: String)(using Async)(using CurlRuntimeContext) =
+  def postRequest(msg: String)(
+      using Async
+  )(
+      using CurlRuntimeContext
+  ) =
     CurlRequest(
       SimpleRequest(
         HttpVersion.V1_0,
         HttpMethod.POST,
         List(),
         "http://localhost:8080/http/echo",
-        msg.getBytes(),
+        msg.getBytes()
       )
     ) match
-      case Success(response) => assertEquals(response.body.map(_.toChar).mkString, msg)
+      case Success(response)  => assertEquals(response.body.map(_.toChar).mkString, msg)
       case Failure(exception) => fail("couldn't get the response", exception)
 
-  def getRequest()(using Async)(using CurlRuntimeContext) =
+  def getRequest()(
+      using Async
+  )(
+      using CurlRuntimeContext
+  ) =
     val res = CurlRequest(
       SimpleRequest(
         HttpVersion.V1_0,
         HttpMethod.GET,
         List(),
         "http://localhost:8080/http",
-        "".getBytes(),
+        "".getBytes()
       )
     ) match
       case Success(response) =>
@@ -52,23 +59,35 @@ class CurlMultiRuntimeSuite extends munit.FunSuite {
         fail("couldn't get the response", exception)
     res.map(_.toChar).mkString
 
-  def failed_request()(using Async)(using CurlRuntimeContext) =
+  def failed_request()(
+      using Async
+  )(
+      using CurlRuntimeContext
+  ) =
     CurlRequest(
       SimpleRequest(
         HttpVersion.V1_0,
         HttpMethod.GET,
         List(),
         "unsupported://server",
-        "".getBytes(),
+        "".getBytes()
       )
     ) match
-      case Success(response) => fail("shouldn't get a response")
+      case Success(response)  => fail("shouldn't get a response")
       case Failure(exception) => assert(exception.isInstanceOf[CurlError])
 
-  def request()(using Async)(using CurlRuntimeContext) =
+  def request()(
+      using Async
+  )(
+      using CurlRuntimeContext
+  ) =
     postRequest(getRequest())
 
-  def longRequest()(using Async)(using CurlRuntimeContext) =
+  def longRequest()(
+      using Async
+  )(
+      using CurlRuntimeContext
+  ) =
     postRequest(longMsg)
 
   def getTime[T](body: () => T) =
@@ -91,7 +110,7 @@ class CurlMultiRuntimeSuite extends munit.FunSuite {
             Seq(
               Future(longRequest()),
               Future(longRequest()),
-              Future(longRequest()),
+              Future(longRequest())
             ).awaitAll
           )
         assert(res.isEmpty)
@@ -106,7 +125,7 @@ class CurlMultiRuntimeSuite extends munit.FunSuite {
               Seq(
                 Future(longRequest()),
                 Future(request()),
-                Future(failed_request()),
+                Future(failed_request())
               ).awaitFirst
             )
   }
@@ -114,7 +133,7 @@ class CurlMultiRuntimeSuite extends munit.FunSuite {
   test("async and sync comparison") {
     CurlMultiRuntime(Int.MaxValue, Int.MaxValue):
       Async.blocking:
-        val n = 3
+        val n     = 3
         val elems = 0 to n - 1
         // Sync
         val syncTime = getTime(() => elems.map(_ => request()))
