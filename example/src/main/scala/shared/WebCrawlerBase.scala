@@ -1,17 +1,16 @@
 package shared
 
-import scala.io.Source
-import scala.util._
-import scala.math.min
-import scala.concurrent.duration
-
-import scala.compiletime.ops.double
+import pollerBear.logger.PBLogger
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
-import pollerBear.logger.PBLogger
+import scala.compiletime.ops.double
+import scala.concurrent.duration
+import scala.io.Source
+import scala.math.min
+import scala.util._
 
 abstract class WebCrawlerBase {
-  var found = HashSet[String]()
+  var found              = HashSet[String]()
   var successfulExplored = HashSet[String]()
 
   // Only for analysis
@@ -20,17 +19,20 @@ abstract class WebCrawlerBase {
   var deadline: Long = -1
 
   def getWebContent(url: String, onResponse: Option[String] => Unit): Unit = ???
-  def awaitResponses(timeout: Long): Unit = ???
+  def awaitResponses(timeout: Long): Unit                                  = ???
 
   def exploreLayer(
       seen: HashSet[String],
-      layer: Array[String],
-      maxConnections: Int,
-  ): Array[String] = {
-    PBLogger.log(s"Exploring layer of size ${layer.size}")
+      layer: List[String],
+      maxConnections: Int
+  ): List[String] = {
     var nextLayer: HashSet[String] = HashSet()
-    var finished = 0
-    var started = 0
+    var finished                   = 0
+    var started                    = 0
+
+    val iter      = layer.iterator
+    val layerSize = layer.size
+    PBLogger.log(s"Exploring layer of size ${layerSize}")
 
     val onResponse = (url: String, response: Option[String]) =>
       finished += 1
@@ -46,33 +48,51 @@ abstract class WebCrawlerBase {
         case None => ()
       ()
 
-    while finished < layer.size do
-      while started < layer.size && started - finished < maxConnections do
-        val url = layer(started)
+    while finished < layerSize do
+      while started < layerSize && started - finished < maxConnections do
+        val url = iter.next()
         started += 1
         getWebContent(url, onResponse(url, _))
 
       awaitResponses(deadline - System.currentTimeMillis())
-      PBLogger.log(s"Finished: $finished, Started: $started, Layer size: ${layer.size}")
+      PBLogger.log(s"Finished: $finished, Started: $started, Layer size: ${layerSize}")
     end while
 
-    (nextLayer -- seen).toArray
+    (nextLayer -- seen).toList
   }
+
+  var checkPointTime = -1L
+  var startUrl       = ""
 
   @tailrec
   final def crawlRecursive(
       seen: HashSet[String],
-      layer: Array[String],
+      layer: List[String],
       maxConnections: Int,
-      depth: Int,
+      depth: Int
   ): Unit =
-    if depth != 0 then
+    if System.currentTimeMillis() - checkPointTime > 10000 then
+      println(s"Found: ${found.size}, Explored: ${successfulExplored.size}, Time: ${System
+          .currentTimeMillis() - checkPointTime}")
+      checkPointTime = System.currentTimeMillis()
+
+      found = HashSet(startUrl)
+      successfulExplored = HashSet.empty
+      charsDownloaded = 0
+
+      crawlRecursive(
+        HashSet.empty,
+        List(startUrl),
+        maxConnections,
+        depth
+      )
+    else if depth != 0 then
       val nextLayer = exploreLayer(seen, layer, maxConnections)
       crawlRecursive(
         seen ++ nextLayer,
         nextLayer,
         maxConnections,
-        depth - 1,
+        depth - 1
       )
 
   def crawl(url: String, maxConnections: Int, timeout: Long): Unit = {
@@ -83,10 +103,12 @@ abstract class WebCrawlerBase {
      */
     val maxDepth = 100000000 // if DEBUG then 2 else 1000
 
+    checkPointTime = System.currentTimeMillis()
+    startUrl = url
     deadline = System.currentTimeMillis() + timeout
     found = HashSet(url)
 
-    crawlRecursive(HashSet.empty, Array(url), maxConnections, maxDepth)
+    crawlRecursive(HashSet.empty, List(url), maxConnections, maxDepth)
   }
 
 }

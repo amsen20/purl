@@ -6,9 +6,9 @@ import shared.*
 
 @main def run(url: String, timeout: Long, maxConnections: Int): Unit =
   println("Using curl version: " + CurlMultiRuntime.curlVersionTriple.toString())
-  SingleThreadedPoller { poller =>
-    given Poller = poller
-    CurlMultiRuntime(maxConnections, Int.MaxValue):
+  withPassivePoller { poller =>
+    given PassivePoller = poller
+    CurlMultiRuntime:
       // TODO make a sugar API for this
       poller.registerOnDeadline(
         System.currentTimeMillis() + timeout,

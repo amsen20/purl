@@ -5,14 +5,14 @@ import gurl.http.simple.*
 import gurl.http.simple.{ HttpVersion, SimpleRequest }
 import gurl.http.CurlRequest
 import gurl.unsafe.CurlRuntimeContext
-import pollerBear.runtime.Poller
+import pollerBear.runtime.PassivePoller
 import scala.util.*
 import shared.TimeOut
 import shared.WebCrawlerBase
 
 class WebCrawler(
     using curlRuntimeContext: CurlRuntimeContext,
-    poller: Poller
+    poller: PassivePoller
 ) extends WebCrawlerBase:
 
   override def getWebContent(url: String, onResponse: Option[String] => Unit): Unit =
