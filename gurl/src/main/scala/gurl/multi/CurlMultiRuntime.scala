@@ -20,7 +20,7 @@ import scala.scalanative.unsafe._
  */
 object CurlMultiRuntime extends CurlRuntime {
 
-  def apply[T](maxConcurrentConnections: Int, maxConnections: Int)(
+  def apply[T](
       using Poller
   )(body: CurlRuntimeContext ?=> T) =
     var multiHandle: Ptr[CURLM] = null
@@ -36,14 +36,17 @@ object CurlMultiRuntime extends CurlRuntime {
         throw new RuntimeException("curl_multi_init")
 
       cmc = CurlMultiPBContext.getCurlMultiContext(
-        multiHandle,
-        maxConcurrentConnections,
-        maxConnections
+        multiHandle
       )
 
       body(
         using cmc
       )
+    } catch {
+      case e: Throwable =>
+        PBLogger.log("error in the curl multi runtime")
+        e.printStackTrace()
+        throw e
     } finally {
       if (cmc != null && multiHandle != null)
         PBLogger.log("cleaning up the curl multi runtime")

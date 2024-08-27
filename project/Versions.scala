@@ -6,5 +6,5 @@ object Versions {
   val http4sVersion     = "0.23.25"
   val munitVersion      = "1.0.0-RC1"
   val munitCEVersion    = "2.0.0-M4"
-  val pollerBearVersion = "0.1-d800ef8-20240821T143216Z-SNAPSHOT"
+  val pollerBearVersion = "0.2-14db017-SNAPSHOT"
 }

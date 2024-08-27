@@ -1,6 +1,8 @@
 package gurl
 package multi
 
+import gurl.internal.GCRoot
+import gurl.internal.HandlePool
 import gurl.internal.Utils
 import gurl.unsafe._
 import gurl.unsafe.libcurl.CURL
@@ -21,9 +23,7 @@ import scala.scalanative.unsigned._
  * @param maxConnections
  */
 final private[gurl] class CurlMultiPBContext(
-    multiHandle: Ptr[libcurl.CURLM],
-    maxConcurrentConnections: Int,
-    maxConnections: Int
+    multiHandle: Ptr[libcurl.CURLM]
 )(
     using poller: Poller
 ) extends CurlRuntimeContext {
@@ -31,10 +31,15 @@ final private[gurl] class CurlMultiPBContext(
   private val gcRoot = new GCRoot()
 
   // A map of all callbacks that are waiting for a response on a specific handle
+  // NOTE Who ever that removes a handle should also call the callback with proper argument.
   private val callbacks = mutable.Map[Ptr[libcurl.CURL], Option[Throwable] => Unit]()
 
   // Pool of handles that are not used, this is for reusing the easy handles
-  private val handlePool = mutable.Queue[Ptr[libcurl.CURL]]()
+  // FIXME handles can leak in following scenario:
+  // - handle is got
+  // - before assigning the handle to a callback some error happens
+  // - The handle is not given back to the pool.
+  private val handlePool = new HandlePool()
 
   // Set of current active file descriptors, that are being used by easy handles
   private val fdSet = mutable.HashSet[Int]()
@@ -47,58 +52,115 @@ final private[gurl] class CurlMultiPBContext(
   // The ID for the deadline given by the poller
   private var deadLineID = -1L
 
+  private def setReason(e: Throwable): Unit =
+    synchronized:
+      if reason.isEmpty then reason = Some(e)
+
+  private def setReason(e: Option[Throwable]): Unit =
+    e.foreach(setReason)
+
   private def throwIfNotSafe(): Unit =
     if !isSafe() then
-      PBLogger.log("tried to do an operation, but the runtime is in corrupted state")
+      PBLogger.log("tried to do an operation, but the curl runtime is in corrupted state")
       throw reason.get
 
   private def isSafe(): Boolean =
-    reason.isEmpty
+    synchronized:
+      reason.isEmpty
 
   override def addHandle(handle: Ptr[libcurl.CURL], cb: Option[Throwable] => Unit): Unit =
+    // Fail fast if cannot continue.
     throwIfNotSafe()
-    PBLogger.log("adding a handle to curl multi...")
 
-    // TODO check if already exists
-    callbacks(handle) = cb
-    val code = libcurl.curl_multi_add_handle(multiHandle, handle)
-    if (code.isError) throw CurlError.fromMCode(code)
+    // The multi handle should be called from the poller thread.
+    // Adding anything to it is done by registering a callback that does add that thing.
+    poller.registerOnCycle(
+      {
+        // Always returns false, because it is one time usage callback.
+        case Some(e: PollerCleanUpException) =>
+          setReason(e)
+          // Callback is not added, so call it
+          // with the error and forget about it (user is informed).
+          cb(Some(e))
+          false
+        case Some(e) =>
+          setReason(e)
+          cb(Some(e))
+          false
+        case None =>
+          if !isSafe() then
+            PBLogger.log("tried to add a handle, but the curl runtime is in corrupted state")
+            cb(Some(reason.get))
+            false
+          else
+            PBLogger.log("adding a handle to curl multi...")
+            // TODO check if exists
+            callbacks(handle) = cb
+            val code = libcurl.curl_multi_add_handle(multiHandle, handle)
+            if code.isError then
+              setReason(CurlError.fromMCode(code))
+              // Will be removed by the cleanUp.
+              false
+            else
+              PBLogger.log("handle added")
+              false
+      },
+      // If the callback cannot be executed, the runtime is corrupted.
+      // All other possibilities are handled.
+      setReason
+    )
 
-    PBLogger.log("handle added")
+    poller.wakeUp()
 
   /**
-   * If the method is called and the callback is still in the map,
-   * it means that it is called from outside the lib curl runtime.
-   * So the callback will be removed.
-   * Otherwise, it is the runtime responsibility to clean the handle and cleanUp.
+   * Will remove the handle from the multi handle (if not already removed).
+   * NOTE The method does not call the callback associated with given handle.
    */
   override def removeHandle(handle: Ptr[libcurl.CURL]): Unit =
-    // TODO think of a better solution to this
-    // throwIfNotSafe()
-    // TODO change it to a more specific exception
-    PBLogger.log("removing a handle from runtime...")
+    // Fail fast if cannot continue.
+    throwIfNotSafe()
 
-    callbacks.remove(handle).foreach { _ =>
-      val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
-      if code.isError then throw CurlError.fromMCode(code)
+    // The multi handle should be called from the poller thread.
+    // Adding anything to it is done by registering a callback that does add that thing.
+    poller.registerOnCycle(
+      {
+        // Always returns false, because it is one time usage callback.
+        case Some(e: PollerCleanUpException) =>
+          setReason(e)
+          // Will be (or was) removed in cleanUp.
+          false
+        case Some(e) =>
+          setReason(e)
+          // Will be (or was) removed in cleanUp.
+          false
+        case None =>
+          if !isSafe() then
+            PBLogger.log("tried to remove a handle, but the curl runtime is in corrupted state")
+            // Will be (or was) removed in cleanUp.
+            false
+          else
+            PBLogger.log("removing a handle from curl multi...")
+            callbacks
+              .remove(handle)
+              .foreach(_ =>
+                handlePool.giveBack(handle)
+                val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
+                if code.isError then
+                  setReason(CurlError.fromMCode(code))
+                  // Will be (or was) removed in cleanUp.
+                else PBLogger.log("handle removed")
+              )
+            false
+      },
+      // If the callback cannot be executed, the runtime is corrupted.
+      // All other possibilities are handled.
+      setReason
+    )
 
-      handlePool.enqueue(handle)
-    }
-    // called from the callback so no need to call the callback
-    // cb(Some(new RuntimeException("handle removed")))
-
-    PBLogger.log("handle removed")
+    poller.wakeUp()
 
   override def getNewHandle(): Ptr[libcurl.CURL] =
-    if handlePool.nonEmpty then
-      val handle = handlePool.dequeue()
-      libcurl.curl_easy_reset(handle)
-      handle
-    else
-      val handle = libcurl.curl_easy_init()
-      if (handle == null)
-        throw new RuntimeException("curl_easy_init")
-      handle
+    handlePool.get()
 
   /**
    * Keeps track of the object to prevent it from being garbage collected
@@ -122,7 +184,9 @@ final private[gurl] class CurlMultiPBContext(
     0
 
   private def addOrChangeFd(fd: Int, events: EpollEvents): Unit =
-    if poller.expectFromFd(fd, events) then PBLogger.log(s"changed events on fd: ${fd}...")
+    if fdSet.contains(fd) then
+      PBLogger.log(s"changed events on fd: ${fd}...")
+      poller.expectFromFd(fd, events)
     else
       PBLogger.log(s"adding events on fd: ${fd}...")
       poller.registerOnFd(fd, handleEventOnFd(fd), events)
@@ -143,7 +207,8 @@ final private[gurl] class CurlMultiPBContext(
         addOrChangeFd(socketFd, EpollInputEvents().input().output())
       case libcurl_const.CURL_POLL_REMOVE =>
         PBLogger.log("poll remove")
-        fdSet -= socketFd
+        fdSet.remove(socketFd)
+        PBLogger.log("HHHHHHHHEERREEE")
         poller.removeOnFd(socketFd) // TODO check if it works
       case _ =>
       // Handle other cases here
@@ -165,10 +230,10 @@ final private[gurl] class CurlMultiPBContext(
 
     0 // success
 
-  def start: Poller#onStart =
+  def start: Poller#OnStart =
     case Some(e: PollerCleanUpException) => false
     case Some(e) =>
-      if reason.isEmpty then reason = Some(e)
+      setReason(e)
       false
     case None =>
       if !isSafe() then
@@ -184,20 +249,24 @@ final private[gurl] class CurlMultiPBContext(
           runningHandles
         )
         if (actionCode.isError)
-          reason = Some(CurlError.fromMCode(actionCode))
+          setReason(CurlError.fromMCode(actionCode))
           false
         else true
 
-  def handleEventOnFd(fd: Int): Poller#onFd =
+  def handleEventOnFd(fd: Int): Poller#OnFd =
     case Right(e: PollerCleanUpException) => false
     case Right(e) =>
-      if reason.isEmpty then reason = Some(e)
+      setReason(e)
+
+      fdSet.remove(fd)
       false
     case Left(events) =>
       if !isSafe() then
         PBLogger.log(
           s"tried to handle an event for ${fd}, but the curl runtime is in corrupted state"
         )
+
+        fdSet.remove(fd)
         false
       else
         PBLogger.log(s"handling an event on fd: ${fd}...")
@@ -210,14 +279,16 @@ final private[gurl] class CurlMultiPBContext(
         val actionCode =
           libcurl.curl_multi_socket_action(multiHandle, fd, what, runningHandles)
         if (actionCode.isError)
-          reason = Some(CurlError.fromMCode(actionCode))
+          setReason(CurlError.fromMCode(actionCode))
+
+          fdSet.remove(fd)
           false
         else true
 
-  def eachCycle: Poller#onCycle =
+  def eachCycle: Poller#OnCycle =
     case Some(e: PollerCleanUpException) => false
     case Some(e) =>
-      if reason.isEmpty then reason = Some(e)
+      setReason(e)
       false
     case None =>
       if !isSafe() then
@@ -239,6 +310,7 @@ final private[gurl] class CurlMultiPBContext(
               val handle = libcurl.curl_CURLMsg_easy_handle(info)
 
               callbacks.remove(handle).foreach { cb =>
+                handlePool.giveBack(handle)
                 val result = libcurl.curl_CURLMsg_data_result(info)
                 // The callback should remove the handle
                 cb(
@@ -247,8 +319,7 @@ final private[gurl] class CurlMultiPBContext(
                 )
 
                 val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
-                if code.isError then reason = Some(CurlError.fromMCode(code))
-                else handlePool.enqueue(handle)
+                if code.isError then setReason(CurlError.fromMCode(code))
               }
             }
 
@@ -258,10 +329,10 @@ final private[gurl] class CurlMultiPBContext(
         reason.isEmpty
       } else reason.isEmpty
 
-  def onDeadline: Poller#onDeadline =
+  def onDeadline: Poller#OnDeadline =
     case Some(e: PollerCleanUpException) => false
     case Some(e) =>
-      if reason.isEmpty then reason = Some(e)
+      setReason(e)
       false
     case None =>
       if !isSafe() then
@@ -278,7 +349,7 @@ final private[gurl] class CurlMultiPBContext(
           runningHandles
         )
         if (actionCode.isError)
-          reason = Some(CurlError.fromMCode(actionCode))
+          setReason(CurlError.fromMCode(actionCode))
           false
         else true
 
@@ -286,45 +357,53 @@ final private[gurl] class CurlMultiPBContext(
    * Cleans up all the easy handles
    */
   def cleanUp(): Unit =
-    // TODO use a more specific exception
-    if reason.isEmpty then reason = Some(new RuntimeException("cleaning up the curl runtime"))
+    setReason(CurlMultiCleanUpError)
 
-    // Inform their callbacks that the
-    // polling is stopped.
-    // The callbacks should remove the handles their selves.
-    PBLogger.log("informing callbacks...")
+    // The cleanUp is called from the poller thread.
+    // WARN this callback may takes a while to execute.
+    poller.registerOnCycle(
+      { case _ =>
+        // Inform their callbacks that the runtime does not continue to work.
+        // The callbacks may try to remove the handles themselves.
+        PBLogger.log("informing callbacks...")
 
-    // Copying the callbacks to clear the callbacks.
-    val cbAndHandles = for (handle, cb) <- callbacks yield (handle, cb)
+        // Copying the callbacks to clear the callbacks.
+        val cbAndHandles = for (handle, cb) <- callbacks yield (handle, cb)
 
-    // The callbacks are cleared so that `removeHandle` will see
-    // that the callback is not present and then not cleanup.
-    callbacks.clear()
-    for (handle, cb) <- cbAndHandles do
-      cb(reason)
+        // The callbacks are cleared so that `removeHandle` will see
+        // that the callback is not present and then not cleanup.
+        callbacks.clear()
+        for (handle, cb) <- cbAndHandles do
+          cb(reason)
 
-      val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
-      if code.isError then throw CurlError.fromMCode(code)
+          val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
+          if code.isError then throw CurlError.fromMCode(code)
 
-      handlePool.enqueue(handle)
+          handlePool.giveBack(handle)
 
-    // Cleaning up the handles
-    PBLogger.log("cleaning up handles...")
-    handlePool.foreach { case handle =>
-      libcurl.curl_easy_cleanup(handle)
-    }
+        // cleaning up the handles
+        PBLogger.log("cleaning up handles...")
+        handlePool.clear()
 
-    handlePool.clear()
+        // clearing fdset from the poller
+        PBLogger.log("cleaning up fds...")
+        fdSet.foreach { case fd =>
+          // Maybe the poller itself is not on a safe state
+          // so trying to remove will cause an exception.
+          // I(amsen) believe this should NOT happen.
+          try poller.removeOnFd(fd)
+          catch { case _ => () }
+        }
 
-    // clearing fdset from the poller
-    PBLogger.log("cleaning up fds...")
-    fdSet.foreach { case fd =>
-      // Maybe the poller itself is not on a safe state
-      // so trying to remove will cause an exception.
-      // I(amsen) believe this should NOT happen.
-      try poller.removeOnFd(fd)
-      catch { case _ => () }
-    }
+        // It is a one time usage callback.
+        false
+      },
+      {
+        case Some(e: PollerCleanUpException) => ()
+        case Some(e) => PBLogger.log("cleanUp couldn't be done completely due to: " + e)
+        case None    => ()
+      }
+    )
 
 }
 
@@ -372,18 +451,16 @@ private[gurl] object CurlMultiPBContext {
       throw CurlError.fromMCode(timerCallbackCode)
 
   def setUpPollerCallbacks(poller: Poller, cmc: CurlMultiPBContext): Unit =
-    poller.registerOnStart(cmc.start)
-    poller.registerOnCycle(cmc.eachCycle)
+    poller.registerOnStart(cmc.start, cmc.setReason)
+    poller.registerOnCycle(cmc.eachCycle, cmc.setReason)
 
   def getCurlMultiContext(
-      multiHandle: Ptr[libcurl.CURLM],
-      maxConcurrentConnections: Int,
-      maxConnections: Int
+      multiHandle: Ptr[libcurl.CURLM]
   )(
       using poller: Poller
   ): CurlMultiPBContext = {
     val cmc =
-      new CurlMultiPBContext(multiHandle, maxConcurrentConnections, maxConnections)
+      new CurlMultiPBContext(multiHandle)
 
     // Setting up event based callbacks
     setUpCurlCallbacks(cmc, multiHandle)
