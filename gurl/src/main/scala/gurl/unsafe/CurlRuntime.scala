@@ -1,10 +1,10 @@
-package gurl
+package purl
 package unsafe
 
 import scala.collection.mutable.ListBuffer
 import scala.scalanative.unsafe._
 
-abstract private[gurl] class CurlRuntime {
+abstract private[purl] class CurlRuntime {
   def curlVersion: String = fromCString(libcurl.curl_version())
 
   private lazy val versionData = libcurl.curl_version_info(libcurl.CURLVERSION_NOW())

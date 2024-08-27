@@ -1,6 +1,6 @@
 package crawler
 
-import gurl.multi.CurlMultiRuntime
+import purl.multi.CurlMultiRuntime
 import pollerBear.runtime._
 import shared.*
 

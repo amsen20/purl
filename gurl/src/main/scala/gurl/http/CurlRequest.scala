@@ -1,11 +1,11 @@
-package gurl
+package purl
 package http
 
-import gurl.internal._
-import gurl.unsafe.CurlRuntimeContext
-import gurl.http.simple._
-import gurl.unsafe.libcurl_const
-import gurl.unsafe.CURLcode
+import purl.internal._
+import purl.unsafe.CurlRuntimeContext
+import purl.http.simple._
+import purl.unsafe.libcurl_const
+import purl.unsafe.CURLcode
 import pollerBear.logger.PBLogger
 
 import scala.scalanative.unsafe._

@@ -1,4 +1,4 @@
-package gurl
+package purl
 package unsafe
 
 import scala.scalanative.unsafe._
@@ -7,7 +7,7 @@ import scala.scalanative.posix.sys.select
 
 import libcurl_const._
 
-private[gurl] object libcurl_const {
+private[purl] object libcurl_const {
   final val CURLMSG_DONE: UInt = 1.toUInt
 
   final val CURLOPTTYPE_LONG = 0
@@ -85,24 +85,24 @@ private[gurl] object libcurl_const {
   final val CURL_SOCKET_TIMEOUT = CURL_SOCKET_BAD
 }
 
-final private[gurl] case class CURLcode(value: CInt) extends AnyVal {
+final private[purl] case class CURLcode(value: CInt) extends AnyVal {
   @inline def isOk: Boolean = value == 0
   @inline def isError: Boolean = value != 0
 }
-final private[gurl] case class CURLMcode(value: CInt) extends AnyVal {
+final private[purl] case class CURLMcode(value: CInt) extends AnyVal {
   @inline def isOk: Boolean = value == 0
   @inline def isError: Boolean = value != 0
 }
 
 @link("curl")
 @extern
-private[gurl] object libcurl {
+private[purl] object libcurl {
 
   type CURL
-  type CURLcode = gurl.unsafe.CURLcode
+  type CURLcode = purl.unsafe.CURLcode
 
   type CURLM
-  type CURLMcode = gurl.unsafe.CURLMcode
+  type CURLMcode = purl.unsafe.CURLMcode
 
   type CURLMSG = CUnsignedInt
   type CURLMsg

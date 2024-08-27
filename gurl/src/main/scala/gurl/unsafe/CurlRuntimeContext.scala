@@ -1,4 +1,4 @@
-package gurl
+package purl
 package unsafe
 
 import scala.scalanative.unsafe._

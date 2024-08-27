@@ -1,4 +1,4 @@
-package gurl
+package purl
 package internal
 
 import scala.collection.mutable

@@ -1,4 +1,4 @@
-package gurl
+package purl
 
 import scala.scalanative.unsafe.fromCString
 
@@ -16,16 +16,16 @@ object CurlError {
         s"curl multi interface responded with error code: ${code.value}\n$info"
       )
 
-  private[gurl] def fromCode(code: CURLcode) = {
+  private[purl] def fromCode(code: CURLcode) = {
     val info = fromCString(curl_easy_strerror(code))
     new CurlEasyError(code, info)
   }
-  private[gurl] def fromCode(code: CURLcode, details: String) = {
+  private[purl] def fromCode(code: CURLcode, details: String) = {
     val info = fromCString(curl_easy_strerror(code))
     new CurlEasyError(code, info, Some(details))
   }
 
-  private[gurl] def fromMCode(code: CURLMcode) = {
+  private[purl] def fromMCode(code: CURLMcode) = {
     val info = fromCString(curl_multi_strerror(code))
     new CurlMultiError(code, info)
   }

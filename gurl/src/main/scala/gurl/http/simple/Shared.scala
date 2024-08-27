@@ -1,4 +1,4 @@
-package gurl.http
+package purl.http
 package simple
 
 enum HttpVersion(raw: String):

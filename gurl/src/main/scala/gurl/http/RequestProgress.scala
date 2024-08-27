@@ -1,10 +1,10 @@
-package gurl.http
+package purl.http
 
-import gurl.unsafe.CurlRuntimeContext
-import gurl.internal.Utils
+import purl.unsafe.CurlRuntimeContext
+import purl.internal.Utils
 import scala.scalanative.unsafe._
 
-final private[gurl] class RequestProgress(using cc: CurlRuntimeContext) {
+final private[purl] class RequestProgress(using cc: CurlRuntimeContext) {
   def progressCallback(
       dltotal: CLongLong,
       dlnow: CLongLong,
@@ -14,7 +14,7 @@ final private[gurl] class RequestProgress(using cc: CurlRuntimeContext) {
     cc.monitorProgress(dltotal, dlnow, ultotal, ulnow)
 }
 
-private[gurl] object RequestProgress {
+private[purl] object RequestProgress {
   def apply(using cc: CurlRuntimeContext)(): RequestProgress = new RequestProgress()
 
   def progressCallback(

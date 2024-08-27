@@ -1,12 +1,12 @@
-package gurl
+package purl
 package multi
 
-import gurl.internal.GCRoot
-import gurl.internal.HandlePool
-import gurl.internal.Utils
-import gurl.unsafe._
-import gurl.unsafe.libcurl.CURL
-import gurl.CurlError
+import purl.internal.GCRoot
+import purl.internal.HandlePool
+import purl.internal.Utils
+import purl.unsafe._
+import purl.unsafe.libcurl.CURL
+import purl.CurlError
 import pollerBear.epoll._
 import pollerBear.logger.PBLogger
 import pollerBear.runtime.Poller
@@ -22,7 +22,7 @@ import scala.scalanative.unsigned._
  * @param maxConcurrentConnections
  * @param maxConnections
  */
-final private[gurl] class CurlMultiPBContext(
+final private[purl] class CurlMultiPBContext(
     multiHandle: Ptr[libcurl.CURLM]
 )(
     using poller: Poller
@@ -407,7 +407,7 @@ final private[gurl] class CurlMultiPBContext(
 
 }
 
-private[gurl] object CurlMultiPBContext {
+private[purl] object CurlMultiPBContext {
 
   def setUpCurlCallbacks(cmc: CurlMultiPBContext, multiHandle: Ptr[libcurl.CURLM]): Unit =
     val multiSocket = MultiSocket(cmc.asInstanceOf[CurlRuntimeContext])

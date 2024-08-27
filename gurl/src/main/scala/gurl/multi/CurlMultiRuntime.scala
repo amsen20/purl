@@ -1,8 +1,8 @@
-package gurl
+package purl
 package multi
 
-import gurl.unsafe._
-import gurl.unsafe.libcurl.CURLM
+import purl.unsafe._
+import purl.unsafe.libcurl.CURLM
 import pollerBear.epoll._
 import pollerBear.logger.PBLogger
 import pollerBear.runtime._

@@ -1,4 +1,4 @@
-package gurl
+package purl
 package multi
 
 sealed abstract class CurlMultiError(msg: String) extends RuntimeException(msg)

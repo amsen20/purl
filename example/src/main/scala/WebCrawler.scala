@@ -1,10 +1,10 @@
 package crawler
 
-import gurl.http.*
-import gurl.http.simple.*
-import gurl.http.simple.{ HttpVersion, SimpleRequest }
-import gurl.http.CurlRequest
-import gurl.unsafe.CurlRuntimeContext
+import purl.http.*
+import purl.http.simple.*
+import purl.http.simple.{ HttpVersion, SimpleRequest }
+import purl.http.CurlRequest
+import purl.unsafe.CurlRuntimeContext
 import pollerBear.runtime.PassivePoller
 import scala.util.*
 import shared.TimeOut

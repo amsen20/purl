@@ -1,19 +1,19 @@
-package gurl
+package purl
 package multi
 
-import gurl.unsafe.CurlRuntimeContext
-import gurl.internal.Utils
-import gurl.unsafe.libcurl._
+import purl.unsafe.CurlRuntimeContext
+import purl.internal.Utils
+import purl.unsafe.libcurl._
 import scala.scalanative.unsafe._
 
-final private[gurl] class MultiTimer(cc: CurlRuntimeContext) {
+final private[purl] class MultiTimer(cc: CurlRuntimeContext) {
   def timerCallback(
       timeout_ms: CLong
   ): CInt =
     cc.expectTimer(timeout_ms)
 }
 
-private[gurl] object MultiTimer {
+private[purl] object MultiTimer {
   def apply(cc: CurlRuntimeContext): MultiTimer = new MultiTimer(cc)
 
   def timerCallback(

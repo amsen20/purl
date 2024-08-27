@@ -1,8 +1,8 @@
-package gurl
+package purl
 package internal
 
-import gurl.unsafe.libcurl._
-import gurl.internal.Utils.toPtr
+import purl.unsafe.libcurl._
+import purl.internal.Utils.toPtr
 
 import scala.scalanative.unsafe._
 import scala.util.Failure
@@ -10,7 +10,7 @@ import scala.util.Success
 import scala.scalanative.runtime.RawPtr
 import collection.mutable
 
-final private[gurl] class CurlSList(private[gurl] var list: Ptr[curl_slist]) {
+final private[purl] class CurlSList(private[purl] var list: Ptr[curl_slist]) {
   private val string_list_shadow: mutable.ArrayBuffer[Array[Byte]] = mutable.ArrayBuffer.empty
 
   @inline def append(str: Array[Byte]): Unit =
@@ -25,7 +25,7 @@ final private[gurl] class CurlSList(private[gurl] var list: Ptr[curl_slist]) {
   * in the given zone and runs the body with
   * the curl_slist.
   */
-private[gurl] object CurlSList {
+private[purl] object CurlSList {
   def getSList(): (CurlSList, () => Unit) =
     val slist: CurlSList = CurlSList(list = null)
 

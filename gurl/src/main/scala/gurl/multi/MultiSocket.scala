@@ -1,12 +1,12 @@
-package gurl
+package purl
 package multi
 
-import gurl.unsafe.CurlRuntimeContext
-import gurl.internal.Utils
-import gurl.unsafe.libcurl._
+import purl.unsafe.CurlRuntimeContext
+import purl.internal.Utils
+import purl.unsafe.libcurl._
 import scala.scalanative.unsafe._
 
-final private[gurl] class MultiSocket(cc: CurlRuntimeContext) {
+final private[purl] class MultiSocket(cc: CurlRuntimeContext) {
   def socketCallback(
       easy: Ptr[CURL],
       sockFd: CInt,
@@ -15,7 +15,7 @@ final private[gurl] class MultiSocket(cc: CurlRuntimeContext) {
     cc.expectSocket(easy, sockFd, what)
 }
 
-private[gurl] object MultiSocket {
+private[purl] object MultiSocket {
   def apply(cc: CurlRuntimeContext): MultiSocket = new MultiSocket(cc)
 
   def socketCallback(

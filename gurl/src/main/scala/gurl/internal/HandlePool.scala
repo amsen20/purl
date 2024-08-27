@@ -1,7 +1,7 @@
-package gurl
+package purl
 package internal
 
-import gurl.unsafe._
+import purl.unsafe._
 import scala.collection.mutable
 import scala.scalanative.unsafe._
 
