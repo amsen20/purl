@@ -18,7 +18,7 @@ class WebCrawler(
   override def getWebContent(url: String, onResponse: Option[String] => Unit): Unit =
     CurlRequest(
       SimpleRequest(
-        HttpVersion.V2,
+        HttpVersion.V1_1,
         HttpMethod.GET,
         List(),
         url,
