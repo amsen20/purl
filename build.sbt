@@ -62,8 +62,7 @@ def when(pred: => Boolean)(refs: CompositeProject*) = if (pred) refs else Nil
 lazy val modules = List(
   purl,
   example,
-  testServer,
-  multiTestSuite
+  testServer
 )
 // For now we do not support websocket on Scala Native
 // ++ when(sys.env.get("EXPERIMENTAL").contains("yes"))(websocketTestSuite)
@@ -79,9 +78,19 @@ lazy val purl = project
   .settings(
     name := "purl",
     libraryDependencies ++= Seq(
-      "ch.epfl.lamp"     %%% "gears"      % gearsVersion,
       "ca.uwaterloo.plg" %%% "pollerbear" % pollerBearVersion,
       "org.scalameta"    %%% "munit"      % munitVersion % Test
+    )
+  )
+
+lazy val gearsPurl = project
+  .in(file("gearsPurl"))
+  .enablePlugins(ScalaNativePlugin)
+  .dependsOn(purl)
+  .settings(
+    libraryDependencies ++= Seq(
+      "ch.epfl.lamp"  %%% "gears" % gearsVersion,
+      "org.scalameta" %%% "munit" % munitVersion % Test
     )
   )
 
@@ -89,11 +98,6 @@ lazy val example = project
   .in(file("example"))
   .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
   .dependsOn(purl)
-  .settings(
-    libraryDependencies ++= Seq(
-      "ch.epfl.lamp" %%% "gears" % gearsVersion
-    )
-  )
 
 lazy val testServer = project
   .in(file("test-server"))
@@ -105,18 +109,6 @@ lazy val testServer = project
       "org.http4s"    %% "http4s-ember-server" % http4sVersion,
       "ch.qos.logback" % "logback-classic"     % "1.4.14"
     )
-  )
-
-lazy val multiTestSuite = project
-  .in(file("tests/multi"))
-  .enablePlugins(ScalaNativePlugin, NoPublishPlugin)
-  .dependsOn(purl)
-  .settings(
-    libraryDependencies ++= Seq(
-      "ch.epfl.lamp"  %%% "gears" % gearsVersion,
-      "org.scalameta" %%% "munit" % munitVersion % Test
-    ),
-    testFrameworks += new TestFramework("munit.Framework")
   )
 
 lazy val startTestServer = taskKey[Unit]("starts test server if not running")
@@ -133,5 +125,7 @@ ThisBuild / startTestServer := {
 ThisBuild / stopTestServer := {
   TestServer.stop()
 }
+
+Test / parallelExecution := false
 
 addCommandAlias("integrate", "startTestServer; test")
