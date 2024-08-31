@@ -1,18 +1,25 @@
 package purl
 package unsafe
 
+import pollerBear.runtime._
 import scala.scalanative.unsafe._
 import scala.scalanative.unsafe.Ptr
 
 abstract class CurlRuntimeContext {
+
+  val defaultAfterModification: Poller#AfterModification = _ => ()
 
   /**
    * Add a handle to the runtime context.
    *
    * @param handle: An unsafe pointer to a CURL handle
    * @param cb: A callback to be called when the process is either finished or failed
+   * @param after: What to do after the handle is added, the parameter is error if the addition failed
    */
-  def addHandle(handle: Ptr[libcurl.CURL], cb: Option[Throwable] => Unit): Unit = ???
+  def addHandle(
+      handle: Ptr[libcurl.CURL],
+      cb: Option[Throwable] => Unit
+  ): Unit = ???
 
   /**
    * Remove a handle from the runtime context.
@@ -20,8 +27,12 @@ abstract class CurlRuntimeContext {
    *
    * @param handle An unsafe pointer to a CURL handle
    * @param removeCallback Whether to remove the callback associated with the handle
+   * @param after What to do after the handle is removed, the parameter is error if the removal failed
    */
-  def removeHandle(handle: Ptr[libcurl.CURL]): Unit = ???
+  def removeHandle(
+      handle: Ptr[libcurl.CURL],
+      after: Poller#AfterModification = defaultAfterModification
+  ): Unit = ???
 
   /**
    * Get a new handle from the runtime context.

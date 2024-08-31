@@ -16,36 +16,40 @@
 
 package org.http4s.test
 
-import cats.effect.IO
 import cats.effect.std.Random
+import cats.effect.IO
 import fs2.Stream
 import org.http4s._
 import org.http4s.dsl.io._
 import org.http4s.implicits._
-import org.http4s.server.Router
 import org.http4s.server.websocket.WebSocketBuilder2
+import org.http4s.server.Router
 import org.http4s.websocket.WebSocketFrame
+import scala.concurrent.duration._
 import scodec.bits.ByteVector
 
-import scala.concurrent.duration._
-
 object TestServer {
+
   def apply(wsb: WebSocketBuilder2[IO]): HttpApp[IO] = Router(
     "http" -> TestHttpServer(),
-    "ws" -> TestWSServer(wsb),
+    "ws"   -> TestWSServer(wsb)
   ).orNotFound
+
 }
 
 object TestHttpServer {
+
   def apply(): HttpRoutes[IO] = HttpRoutes.of {
-    case GET -> Root => IO.randomUUID.map(_.toString).flatMap(Ok(_))
-    case GET -> Root / "404" => NotFound()
-    case GET -> Root / "500" => InternalServerError()
+    case GET -> Root                 => IO.randomUUID.map(_.toString).flatMap(Ok(_))
+    case GET -> Root / "404"         => NotFound()
+    case GET -> Root / "500"         => InternalServerError()
     case req @ POST -> Root / "echo" => req.as[String].flatMap(Ok(_))
   }
+
 }
 
 object TestWSServer {
+
   def apply(wsb: WebSocketBuilder2[IO]): HttpRoutes[IO] = HttpRoutes.of {
     case GET -> Root / "echo" => wsb.build(identity)
     case GET -> Root / "fast" =>
@@ -56,9 +60,11 @@ object TestWSServer {
     case GET -> Root / "closed" =>
       wsb.build(Stream.emit(WebSocketFrame.Close()), _.drain)
   }
+
   private val largeData = for {
-    rng <- Stream.eval(Random.scalaUtilRandom[IO])
-    _ <- Stream.awakeEvery[IO](500.millis)
+    rng     <- Stream.eval(Random.scalaUtilRandom[IO])
+    _       <- Stream.awakeEvery[IO](500.millis)
     payload <- Stream.eval(rng.nextBytes(1 << 20))
   } yield WebSocketFrame.Binary(ByteVector(payload))
+
 }
