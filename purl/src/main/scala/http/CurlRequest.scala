@@ -1,30 +1,35 @@
 package purl
 package http
 
-import purl.internal._
-import purl.unsafe.CurlRuntimeContext
+import pollerBear.logger.PBLogger
 import purl.http.simple._
+import purl.internal._
 import purl.unsafe.libcurl_const
 import purl.unsafe.CURLcode
-import pollerBear.logger.PBLogger
-
+import purl.unsafe.CurlRuntimeContext
+import scala.collection.mutable.ArrayBuffer
 import scala.scalanative.unsafe._
-import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
-import scala.collection.mutable.ArrayBuffer
+import scala.util.Try
 
 object CurlRequest {
+
+  type Cancellation = Throwable => Unit
+
   private def setup(
       handle: CurlEasy,
       sendData: RequestSend,
       recvData: RequestRecv,
       progressData: RequestProgress,
-      version: String,
+      version: HttpVersion,
       method: String,
       headers: CurlSList,
-      uri: String,
-  )(using cc: CurlRuntimeContext, zone: Zone): Unit = {
+      uri: String
+  )(
+      using cc: CurlRuntimeContext,
+      zone: Zone
+  ): Unit = {
     PBLogger.log("Setting up the request...")
     // handle.setVerbose(true)
 
@@ -37,11 +42,10 @@ object CurlRequest {
     handle.setUrl(toCString(uri))
 
     val httpVersion = version match {
-      case "1.0" => libcurl_const.CURL_HTTP_VERSION_1_0
-      case "1.1" => libcurl_const.CURL_HTTP_VERSION_1_1
-      case "2" => libcurl_const.CURL_HTTP_VERSION_2
-      case "3" => libcurl_const.CURL_HTTP_VERSION_3
-      case _ => libcurl_const.CURL_HTTP_VERSION_NONE
+      case HttpVersion.V1_0 => libcurl_const.CURL_HTTP_VERSION_1_0
+      case HttpVersion.V1_1 => libcurl_const.CURL_HTTP_VERSION_1_1
+      case HttpVersion.V2   => libcurl_const.CURL_HTTP_VERSION_2
+      case HttpVersion.V3   => libcurl_const.CURL_HTTP_VERSION_3
     }
     handle.setHttpVersion(toSize(httpVersion))
 
@@ -64,18 +68,42 @@ object CurlRequest {
     cc.addHandle(handle.curl, recvData.onTerminated)
   }
 
-  def apply(req: SimpleRequest)(onResponse: Try[SimpleResponse] => Unit)(using
-      cc: CurlRuntimeContext
-  ): Unit =
+  def apply(req: SimpleRequest)(onResponse: Try[SimpleResponse] => Unit)(
+      using cc: CurlRuntimeContext
+  ): Cancellation =
     PBLogger.log("Creating up a request...")
     val cleanUps = ArrayBuffer.empty[() => Unit]
 
+    def afterHandleRemoved(res: Try[SimpleResponse]) = {
+      cleanUps.foreach(_())
+      cleanUps.clear()
+      onResponse(res)
+    }
+
+    val (handle, handleCleanedUp) =
+      try
+        CurlEasy.getEasy()
+      catch {
+        case e: Throwable =>
+          afterHandleRemoved(Failure(e))
+          throw e
+      }
+    cleanUps.addOne(handleCleanedUp)
+
+    def onResponseWithCleanUp(res: Try[SimpleResponse]) = {
+      PBLogger.log(s"I am being called and the res is: ${res}")
+      try
+        cc.removeHandle(
+          handle.curl,
+          _ => afterHandleRemoved(res)
+        )
+      catch {
+        case e: Throwable =>
+          afterHandleRemoved(res)
+      }
+    }
+
     try
-      val (handle, handleCleanedUp) = CurlEasy.getEasy()
-      cleanUps.addOne(handleCleanedUp)
-      cleanUps.addOne(() => 
-        cc.removeHandle(handle.curl)
-      )
 
       val (headers, slistCleanedUp) = CurlSList.getSList()
       cleanUps.addOne(slistCleanedUp)
@@ -87,18 +115,13 @@ object CurlRequest {
 
       val sendData = RequestSend(req.body)
       cc.keepTrack(sendData)
+      cleanUps.addOne(() => cc.forget(sendData))
 
       val progressData = RequestProgress()
       cc.keepTrack(progressData)
+      cleanUps.addOne(() => cc.forget(progressData))
 
-      val recvData: RequestRecv = RequestRecv(res =>
-        PBLogger.log("I am being called")
-        cleanUps.foreach(_())
-        cc.forget(sendData)
-        cc.forget(progressData)
-
-        onResponse(res)
-      )
+      val recvData: RequestRecv = RequestRecv(onResponseWithCleanUp)
       cc.keepTrack(recvData)
       cleanUps.addOne(() => cc.forget(recvData))
 
@@ -108,17 +131,21 @@ object CurlRequest {
         sendData,
         recvData,
         progressData,
-        req.httpVersion.toString,
+        req.httpVersion,
         req.method.toString,
         headers,
-        req.uri,
+        req.uri
       )
 
     catch {
       case e: Throwable =>
-        cleanUps.foreach(_())
-        onResponse(Failure(e))
+        e.printStackTrace()
+        onResponseWithCleanUp(Failure(e))
+        throw e
     }
 
     PBLogger.log("done creating up the request")
+
+    e => onResponseWithCleanUp(Failure(e))
+
 }

@@ -1,11 +1,12 @@
 package purl
 package multi
 
-import purl.unsafe._
-import purl.unsafe.libcurl.CURLM
 import pollerBear.epoll._
 import pollerBear.logger.PBLogger
 import pollerBear.runtime._
+import purl.global.CurlGlobalContext
+import purl.unsafe._
+import purl.unsafe.libcurl.CURLM
 import scala.concurrent.ExecutionContext
 import scala.scalanative.posix.sched
 import scala.scalanative.unsafe._
@@ -21,16 +22,20 @@ import scala.scalanative.unsafe._
 object CurlMultiRuntime extends CurlRuntime {
 
   def apply[T](
-      using Poller
+      using CurlGlobalContext,
+      Poller
   )(body: CurlRuntimeContext ?=> T) =
     var multiHandle: Ptr[CURLM] = null
     var cmc: CurlMultiPBContext = null
 
-    try {
-      val initCode = libcurl.curl_global_init(2)
-      if (initCode.isError)
-        throw CurlError.fromCode(initCode)
+    def cleanUpMultiHandle() =
+      val code =
+        if multiHandle != null then libcurl.curl_multi_cleanup(multiHandle) else CURLMcode(0)
 
+      if (multiHandle != null && code.isError)
+        CurlError.fromMCode(code).printStackTrace()
+
+    try {
       multiHandle = libcurl.curl_multi_init()
       if (multiHandle == null)
         throw new RuntimeException("curl_multi_init")
@@ -44,21 +49,13 @@ object CurlMultiRuntime extends CurlRuntime {
       )
     } catch {
       case e: Throwable =>
-        PBLogger.log("error in the curl multi runtime")
-        e.printStackTrace()
         throw e
-    } finally {
+    } finally
       if (cmc != null && multiHandle != null)
         PBLogger.log("cleaning up the curl multi runtime")
-        cmc.cleanUp()
+        cmc.cleanUp(cleanUpMultiHandle)
         PBLogger.log("done cleaning up the curl multi runtime")
-
-      val code =
-        if multiHandle != null then libcurl.curl_multi_cleanup(multiHandle) else CURLMcode(0)
-
-      if (multiHandle != null && code.isError)
-        throw CurlError.fromMCode(code)
-      libcurl.curl_global_cleanup()
-    }
+      else if (multiHandle != null)
+        cleanUpMultiHandle()
 
 }

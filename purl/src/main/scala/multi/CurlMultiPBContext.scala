@@ -1,17 +1,18 @@
 package purl
 package multi
 
+import pollerBear.epoll._
+import pollerBear.logger.PBLogger
+import pollerBear.runtime.Poller
+import pollerBear.runtime.PollerCleanUpException
 import purl.internal.GCRoot
 import purl.internal.HandlePool
 import purl.internal.Utils
 import purl.unsafe._
 import purl.unsafe.libcurl.CURL
 import purl.CurlError
-import pollerBear.epoll._
-import pollerBear.logger.PBLogger
-import pollerBear.runtime.Poller
-import pollerBear.runtime.PollerCleanUpException
 import scala.collection.mutable
+import scala.scalanative.posix.fcntl
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
 
@@ -48,7 +49,7 @@ final private[purl] class CurlMultiPBContext(
   private var reason = Option.empty[Throwable]
 
   // The deadline and has been set by libcurl timers
-  private var deadline = -1
+  private var deadline = -1L
   // The ID for the deadline given by the poller
   private var deadLineID = -1L
 
@@ -68,7 +69,10 @@ final private[purl] class CurlMultiPBContext(
     synchronized:
       reason.isEmpty
 
-  override def addHandle(handle: Ptr[libcurl.CURL], cb: Option[Throwable] => Unit): Unit =
+  override def addHandle(
+      handle: Ptr[libcurl.CURL],
+      cb: Option[Throwable] => Unit
+  ): Unit =
     // Fail fast if cannot continue.
     throwIfNotSafe()
 
@@ -116,7 +120,7 @@ final private[purl] class CurlMultiPBContext(
    * Will remove the handle from the multi handle (if not already removed).
    * NOTE The method does not call the callback associated with given handle.
    */
-  override def removeHandle(handle: Ptr[libcurl.CURL]): Unit =
+  override def removeHandle(handle: Ptr[libcurl.CURL], after: Poller#AfterModification): Unit =
     // Fail fast if cannot continue.
     throwIfNotSafe()
 
@@ -140,21 +144,28 @@ final private[purl] class CurlMultiPBContext(
             false
           else
             PBLogger.log("removing a handle from curl multi...")
-            callbacks
-              .remove(handle)
-              .foreach(_ =>
-                handlePool.giveBack(handle)
-                val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
-                if code.isError then
-                  setReason(CurlError.fromMCode(code))
-                  // Will be (or was) removed in cleanUp.
-                else PBLogger.log("handle removed")
-              )
+            if callbacks.remove(handle).isDefined then
+              PBLogger.log("callback is removed with the handle")
+              handlePool.giveBack(handle)
+              val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
+              if code.isError then
+                val err = CurlError.fromMCode(code)
+                setReason(err)
+                after(Some(err))
+              else
+                after(None)
+                PBLogger.log("handle removed")
+            else after(None)
             false
       },
       // If the callback cannot be executed, the runtime is corrupted.
       // All other possibilities are handled.
-      setReason
+      e => {
+        if e.isDefined then
+          e.get.printStackTrace()
+
+        setReason(e)
+      }
     )
 
     poller.wakeUp()
@@ -186,9 +197,13 @@ final private[purl] class CurlMultiPBContext(
   private def addOrChangeFd(fd: Int, events: EpollEvents): Unit =
     if fdSet.contains(fd) then
       PBLogger.log(s"changed events on fd: ${fd}...")
+      val flags = fcntl.fcntl(fd, fcntl.F_GETFL, 0)
+      PBLogger.log(s"fd ${fd} flags: ${flags}")
       poller.expectFromFd(fd, events)
     else
       PBLogger.log(s"adding events on fd: ${fd}...")
+      val flags = fcntl.fcntl(fd, fcntl.F_GETFL, 0)
+      PBLogger.log(s"fd ${fd} flags: ${flags}")
       poller.registerOnFd(fd, handleEventOnFd(fd), events)
       fdSet += fd // TODO should also erase the fd when the callback erases that
 
@@ -218,10 +233,12 @@ final private[purl] class CurlMultiPBContext(
 
   override def expectTimer(Ctimeout: CLong): CInt =
     PBLogger.log("expecting timer...")
-    val timeout = Ctimeout.toLong
-    val now     = System.currentTimeMillis()
-    deadline = if timeout == -1 then -1 else (now + timeout).toInt
-    if deadline != -1 then
+    val timeout     = Ctimeout.toLong
+    val now         = System.currentTimeMillis()
+    var newDeadline = if timeout == -1L then -1L else now + timeout
+    if newDeadline != -1L && deadline != newDeadline then
+      PBLogger.log(s"changing deadline from ${deadline} to ${newDeadline}")
+      deadline = newDeadline
       if deadLineID != -1 then
         PBLogger.log("removing the last deadline...")
         poller.removeOnDeadline(deadLineID)
@@ -312,14 +329,18 @@ final private[purl] class CurlMultiPBContext(
               callbacks.remove(handle).foreach { cb =>
                 handlePool.giveBack(handle)
                 val result = libcurl.curl_CURLMsg_data_result(info)
-                // The callback should remove the handle
+
+                // first remove the handle from multi handle
+                val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
+                if code.isError then setReason(CurlError.fromMCode(code))
+
+                // then, call the callback
+                // The callback tries to remove the handle but it is already removed.
                 cb(
                   if (result.isOk) None
                   else Some(CurlError.fromCode(result))
                 )
 
-                val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
-                if code.isError then setReason(CurlError.fromMCode(code))
               }
             }
 
@@ -356,7 +377,7 @@ final private[purl] class CurlMultiPBContext(
   /**
    * Cleans up all the easy handles
    */
-  def cleanUp(): Unit =
+  def cleanUp(afterInternalCleanUp: () => Unit): Unit =
     setReason(CurlMultiCleanUpError)
 
     // The cleanUp is called from the poller thread.
@@ -374,10 +395,11 @@ final private[purl] class CurlMultiPBContext(
         // that the callback is not present and then not cleanup.
         callbacks.clear()
         for (handle, cb) <- cbAndHandles do
-          cb(reason)
-
+          // first remove the handle from multi handle
           val code = libcurl.curl_multi_remove_handle(multiHandle, handle)
           if code.isError then throw CurlError.fromMCode(code)
+          // then, call the callback
+          cb(reason)
 
           handlePool.giveBack(handle)
 
@@ -396,14 +418,17 @@ final private[purl] class CurlMultiPBContext(
         }
 
         // It is a one time usage callback.
+        afterInternalCleanUp()
         false
       },
       {
         case Some(e: PollerCleanUpException) => ()
         case Some(e) => PBLogger.log("cleanUp couldn't be done completely due to: " + e)
-        case None    => ()
+        case None    => PBLogger.log("cleaned up the runtime successfully")
       }
     )
+
+    poller.wakeUp()
 
 }
 

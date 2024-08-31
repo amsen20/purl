@@ -14,6 +14,7 @@ import scala.util.Failure
 import scala.collection.mutable.ArrayBuffer
 import scala.scalanative.unsafe.CArray
 import scala.util.Try
+import pollerBear.logger.PBLogger
 
 private enum HeaderLine:
   case StatusLine(version: HttpVersion, status: Int)
@@ -76,6 +77,7 @@ final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
   ): CSize =
     val amount = size * nmemb
     Utils.appendBufferToArrayBuffer(buffer, responseBody, amount.toInt)
+    PBLogger.log(s"!!!!!!!!!!!!!Received content ${amount} bytes")
 
     amount
 
@@ -102,6 +104,7 @@ final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
       else HeaderLine.Line(content.toArray)
 
     responseHeaders += headerLine
+    PBLogger.log(s"!!!!!!!!!!!!!Received header: ${headerLine}")
 
     size * nitems
   }
