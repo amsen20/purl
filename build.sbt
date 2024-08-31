@@ -1,7 +1,7 @@
 import scalanative.build._
 import Versions._
 
-ThisBuild / tlBaseVersion := "0.1"
+ThisBuild / tlBaseVersion := "0.2"
 ThisBuild / organization  := "ca.uwaterloo.plg"
 ThisBuild / homepage      := Some(url("https://github.com/amsen20/gurl"))
 ThisBuild / licenses      := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0"))
