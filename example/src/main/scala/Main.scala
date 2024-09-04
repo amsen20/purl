@@ -1,9 +1,10 @@
 package crawler
 
-import purl.multi.CurlMultiRuntime
 import pollerBear.runtime._
-import shared.*
 import purl.global.CurlGlobal
+import purl.http.simple.{ HttpMethod, HttpVersion, SimpleRequest, SimpleResponse }
+import purl.multi.CurlMultiRuntime
+import shared.*
 
 @main def run(url: String, timeout: Long, maxConnections: Int): Unit =
   println("Using curl version: " + CurlMultiRuntime.curlVersionTriple.toString())
@@ -23,4 +24,4 @@ import purl.global.CurlGlobal
 
         val crawler = WebCrawler()
         Experiment.run(crawler, url, timeout, maxConnections)
-  }
+    }

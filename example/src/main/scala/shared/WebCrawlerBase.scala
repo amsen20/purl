@@ -71,7 +71,7 @@ abstract class WebCrawlerBase {
       maxConnections: Int,
       depth: Int
   ): Unit =
-    if System.currentTimeMillis() - checkPointTime > 10000 then
+    if System.currentTimeMillis() - checkPointTime > 1000000 then
       println(s"Found: ${found.size}, Explored: ${successfulExplored.size}, Time: ${System
           .currentTimeMillis() - checkPointTime}")
       checkPointTime = System.currentTimeMillis()

@@ -15,7 +15,7 @@ class CurlRequestSuite extends munit.FunSuite {
   given ExecutionContext = ExecutionContext.global
 
   test("simple get request") {
-    var done = false
+    @volatile var done = false
     CurlGlobal:
       withPassivePoller { poller =>
         given PassivePoller = poller
@@ -42,7 +42,7 @@ class CurlRequestSuite extends munit.FunSuite {
   }
 
   test("status code") {
-    var done = false
+    @volatile var done = false
     CurlGlobal:
       withPassivePoller { poller =>
         given PassivePoller = poller
@@ -71,7 +71,7 @@ class CurlRequestSuite extends munit.FunSuite {
   }
 
   test("error") {
-    var done = false
+    @volatile var done = false
     CurlGlobal:
       withPassivePoller { poller =>
         given PassivePoller = poller
@@ -98,7 +98,7 @@ class CurlRequestSuite extends munit.FunSuite {
   }
 
   test("post echo") {
-    var done = false
+    @volatile var done = false
     CurlGlobal:
       withPassivePoller { poller =>
         given PassivePoller = poller

@@ -25,8 +25,8 @@ object CurlMultiRuntime extends CurlRuntime {
       using CurlGlobalContext,
       Poller
   )(body: CurlRuntimeContext ?=> T) =
-    var multiHandle: Ptr[CURLM] = null
-    var cmc: CurlMultiPBContext = null
+    @volatile var multiHandle: Ptr[CURLM] = null
+    @volatile var cmc: CurlMultiPBContext = null
 
     def cleanUpMultiHandle() =
       val code =
