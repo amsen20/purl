@@ -61,6 +61,7 @@ def when(pred: => Boolean)(refs: CompositeProject*) = if (pred) refs else Nil
 
 lazy val modules = List(
   purl,
+  gearsPurl,
   example,
   testServer
 )
