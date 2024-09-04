@@ -74,11 +74,10 @@ object CurlRequest {
     PBLogger.log("Creating up a request...")
     val cleanUps = ArrayBuffer.empty[() => Unit]
 
-    def afterHandleRemoved(res: Try[SimpleResponse]) = {
+    def afterHandleRemoved(res: Try[SimpleResponse]) =
       cleanUps.foreach(_())
       cleanUps.clear()
       onResponse(res)
-    }
 
     val (handle, handleCleanedUp) =
       try

@@ -2,10 +2,14 @@ package purl
 package unsafe
 
 import pollerBear.runtime._
+import purl.http.simple._
 import scala.scalanative.unsafe._
 import scala.scalanative.unsafe.Ptr
+import scala.util.Try
 
 abstract class CurlRuntimeContext {
+
+  type OnResponse = Try[SimpleResponse] => Unit
 
   val defaultAfterModification: Poller#AfterModification = _ => ()
 
@@ -92,4 +96,14 @@ abstract class CurlRuntimeContext {
       timeout_ms: CLong
   ): CInt = ???
 
+  /**
+   * Start a request and generates an ID for that request.
+   */
+  def startRequest(request: SimpleRequest, onResponse: OnResponse): Long = ???
+
+  /**
+   * Cancels the request with the given ID.
+   * @param requestId
+   */
+  def cancelRequest(requestId: Long): Unit = ???
 }

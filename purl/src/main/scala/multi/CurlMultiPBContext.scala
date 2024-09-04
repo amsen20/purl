@@ -5,6 +5,8 @@ import pollerBear.epoll._
 import pollerBear.logger.PBLogger
 import pollerBear.runtime.Poller
 import pollerBear.runtime.PollerCleanUpException
+import purl.http.simple.SimpleRequest
+import purl.http.CurlRequest
 import purl.internal.GCRoot
 import purl.internal.HandlePool
 import purl.internal.Utils
@@ -13,6 +15,7 @@ import purl.unsafe.libcurl.CURL
 import purl.CurlError
 import scala.collection.mutable
 import scala.scalanative.posix.fcntl
+import scala.scalanative.posix.poll
 import scala.scalanative.unsafe._
 import scala.scalanative.unsigned._
 
@@ -46,12 +49,19 @@ final private[purl] class CurlMultiPBContext(
   private val fdSet = mutable.HashSet[Int]()
 
   // The reason why the multi handle cannot continue working (is in corrupted state)
-  private var reason = Option.empty[Throwable]
+  @volatile private var reason = Option.empty[Throwable]
 
   // The deadline and has been set by libcurl timers
   private var deadline = -1L
   // The ID for the deadline given by the poller
   private var deadLineID = -1L
+
+  // Each request will be associated with a unique number
+  @volatile private var requestNum: Long = -1
+  // For cancelling requests
+  val requestIdToCancellation = mutable.Map[Long, CurlRequest.Cancellation]()
+  // If the request is cancelled before it is started, this map will be used.
+  val requestIdToIsCancelled = mutable.Map[Long, Boolean]()
 
   private def setReason(e: Throwable): Unit =
     synchronized:
@@ -161,8 +171,7 @@ final private[purl] class CurlMultiPBContext(
       // If the callback cannot be executed, the runtime is corrupted.
       // All other possibilities are handled.
       e => {
-        if e.isDefined then
-          e.get.printStackTrace()
+        if e.isDefined then e.get.printStackTrace()
 
         setReason(e)
       }
@@ -184,6 +193,88 @@ final private[purl] class CurlMultiPBContext(
    */
   override def forget(obj: Object): Unit =
     gcRoot.remove(obj)
+
+  override def startRequest(request: SimpleRequest, onResponse: OnResponse): Long =
+    val id = synchronized:
+      val id = requestNum
+      requestNum += 1
+      id
+
+    poller.registerOnCycle(
+      {
+        case Some(e) =>
+          // don't start when you cannot continue
+          setReason(e)
+          false
+        case None =>
+          if !isSafe() then
+            // don't start when you cannot continue
+            PBLogger.log("tried to start a request, but the curl runtime is in corrupted state")
+            false
+          else
+            PBLogger.log("starting a request...")
+            val cancellation = CurlRequest(request)(onResponse)(
+              using this
+            )
+
+            // check for early cancellation
+            val shouldCancel = synchronized:
+              if requestIdToIsCancelled.contains(id) then
+                // cancelled before it is started
+                requestIdToIsCancelled.remove(id)
+                requestIdToCancellation.remove(id)
+                true
+              else
+                requestIdToCancellation(id) = cancellation
+                false
+
+            if shouldCancel then cancellation(CurlMultiRequestCancellation)
+
+            false
+      },
+      setReason
+    )
+
+    // wake up the poller to start the request
+    poller.wakeUp()
+
+    id
+
+  override def cancelRequest(id: Long): Unit =
+    poller.registerOnCycle(
+      {
+        case Some(e) =>
+          // will be cancelled in the cleanUp
+          setReason(e)
+          false
+        case None =>
+          if !isSafe() then
+            // will be cancelled in the cleanUp
+            PBLogger.log("tried to cancel a request, but the curl runtime is in corrupted state")
+            false
+          else
+            PBLogger.log("cancelling a request...")
+            // check is can cancel now
+            val cancellation: Option[CurlRequest.Cancellation] = synchronized:
+              if requestIdToCancellation.contains(id) then
+                // can be cancelled now (it is started)
+                val ret = Some(requestIdToCancellation(id))
+                requestIdToCancellation.remove(id)
+                ret
+              else
+                // cannot be cancelled now (it is not started)
+                // postponing the cancellation
+                requestIdToIsCancelled(id) = true
+                None
+
+            cancellation.foreach(_(CurlMultiRequestCancellation))
+
+            false
+      },
+      setReason
+    )
+
+    poller.wakeUp()
 
   override def monitorProgress(
       dltotal: CLongLong,

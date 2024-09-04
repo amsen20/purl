@@ -15,16 +15,18 @@ def request(req: SimpleRequest)(
     Async
 ): Try[SimpleResponse] =
   val response: Future.Promise[SimpleResponse] = Future.Promise()
-  val cancel                                   = CurlRequest(req)(response.complete(_))
+
+  val cc        = summon[CurlRuntimeContext]
+  val requestID = cc.startRequest(req, response.complete(_))
+
   try
     response.asFuture.awaitResult
   catch {
     case e: CancellationException =>
       PBLogger.log("CALLING CANCELLATION MYSELF")
-      PBLogger.log(cancel.toString())
-      cancel(e)
+      cc.cancelRequest(requestID)
       throw e
     case e: Throwable =>
-      cancel(e)
+      cc.cancelRequest(requestID)
       Failure(e)
   }
