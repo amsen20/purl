@@ -59,40 +59,46 @@ object CurlRequest {
     handle.setProgressData(Utils.toPtr(progressData))
     handle.setProgressFunction(RequestProgress.progressCallback(_, _, _, _, _))
 
-    cc.keepTrack(sendData)
-    cc.keepTrack(recvData)
-    cc.keepTrack(progressData)
     cc.addHandle(handle.curl, recvData.onTerminated)
   }
 
-  def apply(req: SimpleRequest)(using CurlRuntimeContext)(using Async): Try[SimpleResponse] =
+  def apply(req: SimpleRequest)(using cc: CurlRuntimeContext)(using Async): Try[SimpleResponse] =
     try
       CurlEasy.withEasy { handle =>
         val sendData = RequestSend(req.body)
         val recvData = RequestRecv()
         val progressData = RequestProgress()
-        Zone:
-          CurlSList.withSList(headers =>
-            req.headers.foreach(headers.append(_))
-            try {
-              setup(
-                handle,
-                sendData,
-                recvData,
-                progressData,
-                req.httpVersion.toString,
-                req.method.toString,
-                headers,
-                req.uri,
-              )
-              recvData.response()
-            } catch {
-              case e: Throwable =>
-                val cc = summon[CurlRuntimeContext]
-                cc.removeHandle(handle.curl)
-                throw e
-            }
-          )
+        try {
+          cc.keepTrack(sendData)
+          cc.keepTrack(recvData)
+          cc.keepTrack(progressData)
+          Zone:
+            CurlSList.withSList(headers =>
+              req.headers.foreach(headers.append(_))
+              try {
+                setup(
+                  handle,
+                  sendData,
+                  recvData,
+                  progressData,
+                  req.httpVersion.toString,
+                  req.method.toString,
+                  headers,
+                  req.uri,
+                )
+                recvData.response()
+              } catch {
+                case e: Throwable =>
+                  val cc = summon[CurlRuntimeContext]
+                  cc.removeHandle(handle.curl)
+                  throw e
+              }
+            )
+        } finally {
+          cc.forget(sendData)
+          cc.forget(recvData)
+          cc.forget(progressData)
+        }
       }
     catch {
       case e: CancellationException =>

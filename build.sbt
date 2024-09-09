@@ -50,6 +50,7 @@ ThisBuild / envVars ++= {
 def when(pred: => Boolean)(refs: CompositeProject*) = if (pred) refs else Nil
 
 lazy val modules = List(
+  epoll,
   gurl,
   example,
   testServer,
@@ -65,9 +66,17 @@ lazy val root =
     .enablePlugins(NoPublishPlugin)
     .aggregate(modules: _*)
 
+lazy val epoll = project
+  .in(file("epoll"))
+  .enablePlugins(ScalaNativePlugin)
+  .settings(
+    name := "epoll"
+  )
+
 lazy val gurl = project
   .in(file("gurl"))
   .enablePlugins(ScalaNativePlugin)
+  .dependsOn(epoll)
   .settings(
     name := "gurl",
     libraryDependencies ++= Seq(

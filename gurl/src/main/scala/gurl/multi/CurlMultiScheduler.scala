@@ -252,6 +252,9 @@ final private[gurl] class CurlMultiScheduler(
   override def keepTrack(obj: Object): Unit =
     gcRoot.addRoot(obj)
 
+  override def forget(obj: Object): Unit =
+    gcRoot.removeRoot(obj)
+
   override def monitorProgress(
       dltotal: CLongLong,
       dlnow: CLongLong,

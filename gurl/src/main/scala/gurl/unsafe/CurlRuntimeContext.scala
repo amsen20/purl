@@ -34,6 +34,8 @@ abstract class CurlRuntimeContext {
     */
   def keepTrack(obj: Object): Unit = ???
 
+  def forget(obj: Object): Unit = ???
+
   /** Monitors the progress of a connection.
     * For now this just abort when the scheduler is shutting down.
     *
