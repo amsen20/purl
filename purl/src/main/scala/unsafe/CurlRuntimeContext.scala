@@ -11,7 +11,13 @@ abstract class CurlRuntimeContext {
 
   type OnResponse = Try[SimpleResponse] => Unit
 
-  val defaultAfterModification: Poller#AfterModification = _ => ()
+  // Modification for handles cannot be done in parallel, because the libcurl multi handle
+  // is not thread-safe, so the modifications will be done through the poller bear's actions.
+  // This means that for having a non-blocking API for modifying handles, we need to provide
+  // an after modification callback, that is called after the modification is done.
+  type AfterHandleModification = Option[Throwable] => Unit
+
+  val defaultAfterModification: AfterHandleModification = _ => ()
 
   /**
    * Add a handle to the runtime context.
@@ -35,7 +41,7 @@ abstract class CurlRuntimeContext {
    */
   def removeHandle(
       handle: Ptr[libcurl.CURL],
-      after: Poller#AfterModification = defaultAfterModification
+      after: AfterHandleModification = defaultAfterModification
   ): Unit = ???
 
   /**
