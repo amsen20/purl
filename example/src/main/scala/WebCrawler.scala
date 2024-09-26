@@ -20,20 +20,19 @@ class WebCrawler(
       SimpleRequest(
         HttpVersion.V1_1,
         HttpMethod.GET,
-        List(),
+        List("Expect:"),
         url,
-        "".getBytes()
+        ""
       )
     )(res =>
       res match
         case Success(res) =>
           if res.status != 200 then None
           if !res.headers
-              .map(_.map(_.toChar).mkString)
               .map(header => header.contains("content-type") && header.contains("text/html"))
               .reduce(_ || _)
           then None
-          onResponse(Some(res.body.map(_.toChar).mkString))
+          onResponse(Some(res.body))
         case Failure(e) =>
           // e.printStackTrace()
           onResponse(None)

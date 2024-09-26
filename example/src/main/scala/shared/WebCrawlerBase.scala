@@ -34,17 +34,30 @@ abstract class WebCrawlerBase {
     val layerSize = layer.size
     PBLogger.log(s"Exploring layer of size ${layerSize}")
 
-    val onResponse = (url: String, response: Option[String]) =>
+    def onResponse: (String, Option[String]) => Unit = (url: String, response: Option[String]) =>
+      PBLogger.log(s"response for $url received")
+      val time = System.currentTimeMillis()
+      // println("finished: " + finished + "  at " + time)
       finished += 1
 
       response match
         case Some(content) =>
+          PBLogger.log(s"some content was there")
           successfulExplored = successfulExplored + url
           charsDownloaded += content.length
 
+          PBLogger.log(s"extracting links")
           val links = UrlUtils.extractLinks(url, content)
+          PBLogger.log(s"extracted links")
           found = found ++ links
           nextLayer = nextLayer ++ links
+          PBLogger.log(s"added links")
+
+          while started < layerSize && started - finished < maxConnections do
+            val url = iter.next()
+            started += 1
+            val time = System.currentTimeMillis()
+            getWebContent(url, onResponse(url, _))
         case None => ()
       ()
 
@@ -52,10 +65,18 @@ abstract class WebCrawlerBase {
       while started < layerSize && started - finished < maxConnections do
         val url = iter.next()
         started += 1
+        val time = System.currentTimeMillis()
         getWebContent(url, onResponse(url, _))
 
+      // println("vvvvvvvvvvvvvvvvvvvvvv")
+      // println("alive connections before: " + (started - finished))
+      // val timeBeforeAwait = System.currentTimeMillis()
       awaitResponses(deadline - System.currentTimeMillis())
-      PBLogger.log(s"Finished: $finished, Started: $started, Layer size: ${layerSize}")
+      // val timeAfterAwait = System.currentTimeMillis()
+      // println("alive connections after: " + (started - finished))
+      // println("Awaited for: " + (timeAfterAwait - timeBeforeAwait))
+      // println("^^^^^^^^^^^^^^^^^^^^^^")
+      // println( s"Finished: $finished, Started: $started, Layer size: ${layerSize}")
     end while
 
     (nextLayer -- seen).toList
@@ -71,7 +92,7 @@ abstract class WebCrawlerBase {
       maxConnections: Int,
       depth: Int
   ): Unit =
-    if System.currentTimeMillis() - checkPointTime > 1000000 then
+    if System.currentTimeMillis() - checkPointTime > 100000 then
       println(s"Found: ${found.size}, Explored: ${successfulExplored.size}, Time: ${System
           .currentTimeMillis() - checkPointTime}")
       checkPointTime = System.currentTimeMillis()

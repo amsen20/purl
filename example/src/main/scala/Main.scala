@@ -9,7 +9,7 @@ import shared.*
 @main def run(url: String, timeout: Long, maxConnections: Int): Unit =
   println("Using curl version: " + CurlMultiRuntime.curlVersionTriple.toString())
   CurlGlobal:
-    withPassivePoller { poller =>
+    withPassivePoller(16) { poller =>
       given PassivePoller = poller
       CurlMultiRuntime:
         // TODO make a sugar API for this

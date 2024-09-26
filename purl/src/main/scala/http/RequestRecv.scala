@@ -1,30 +1,28 @@
 package purl
 package http
 
+import pollerBear.logger.PBLogger
+import purl.http.simple._
 import purl.internal.Utils
 import purl.unsafe.libcurl_const
-import purl.http.simple._
 import purl.unsafe.CurlRuntimeContext
-
-import scalanative.unsigned._
-import scalanative.unsafe._
-import scalanative.unsigned._
-import scala.util.Success
-import scala.util.Failure
 import scala.collection.mutable.ArrayBuffer
 import scala.scalanative.unsafe.CArray
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
-import pollerBear.logger.PBLogger
+import scalanative.unsafe._
+import scalanative.unsigned._
 
 private enum HeaderLine:
   case StatusLine(version: HttpVersion, status: Int)
-  case Line(content: Array[Byte])
+  case Line(content: String)
   case CRLF
 
 final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
 
   // Mutable shared state.
-  val responseBody: ArrayBuffer[Byte] = ArrayBuffer[Byte]()
+  val responseBody: StringBuffer               = StringBuffer()
   val responseHeaders: ArrayBuffer[HeaderLine] = ArrayBuffer[HeaderLine]()
 
   @volatile var isDone = false
@@ -36,7 +34,7 @@ final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
         // Ensure it is the last status line
         if headersList.tail.exists {
             case HeaderLine.StatusLine(_, _) => true
-            case _ => false
+            case _                           => false
           }
         then return parseResponse(headersList.tail)
 
@@ -49,7 +47,7 @@ final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
           case HeaderLine.Line(content) => content
         }
 
-        val responseContent = responseBody.toArray
+        val responseContent = responseBody.toString
 
         Success(
           SimpleResponse(
@@ -57,7 +55,7 @@ final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
             status,
             headers,
             trailers,
-            responseContent,
+            responseContent
           )
         )
       case _ => parseResponse(headersList.tail)
@@ -67,16 +65,17 @@ final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
     if !isDone then
       res match
         case Some(e) => onResponse(Failure(e))
-        case None => onResponse(parseResponse(responseHeaders.toList))
+        case None    => onResponse(parseResponse(responseHeaders.toList))
       isDone = true
 
   @inline def onWrite(
       buffer: Ptr[CChar],
       size: CSize,
-      nmemb: CSize,
+      nmemb: CSize
   ): CSize =
     val amount = size * nmemb
-    Utils.appendBufferToArrayBuffer(buffer, responseBody, amount.toInt)
+    PBLogger.log("Before receiving content to buffer")
+    responseBody.append(fromCString(buffer))
     PBLogger.log(s"!!!!!!!!!!!!!Received content ${amount} bytes")
 
     amount
@@ -84,11 +83,9 @@ final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
   @inline def onHeader(
       buffer: Ptr[CChar],
       size: CSize,
-      nitems: CSize,
+      nitems: CSize
   ): CSize = {
-    val content = ArrayBuffer[Byte]()
-    Utils.appendBufferToArrayBuffer(buffer, content, size.toInt * nitems.toInt)
-    val decoded = content.map(_.toChar).mkString
+    val decoded = fromCString(buffer)
     val headerLine =
       if decoded == "\r\n" then HeaderLine.CRLF
       else if decoded.startsWith("HTTP/") then
@@ -101,13 +98,14 @@ final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
             isDone = true
             return size * nitems
         }
-      else HeaderLine.Line(content.toArray)
+      else HeaderLine.Line(decoded)
 
     responseHeaders += headerLine
     PBLogger.log(s"!!!!!!!!!!!!!Received header: ${headerLine}")
 
     size * nitems
   }
+
 }
 
 private[purl] object RequestRecv {
@@ -117,7 +115,7 @@ private[purl] object RequestRecv {
       buffer: Ptr[CChar],
       size: CSize,
       nitems: CSize,
-      userdata: Ptr[Byte],
+      userdata: Ptr[Byte]
   ): CSize =
     Utils.fromPtr[RequestRecv](userdata).onHeader(buffer, size, nitems)
 
@@ -125,7 +123,7 @@ private[purl] object RequestRecv {
       buffer: Ptr[CChar],
       size: CSize,
       nmemb: CSize,
-      userdata: Ptr[Byte],
+      userdata: Ptr[Byte]
   ): CSize =
     Utils.fromPtr[RequestRecv](userdata).onWrite(buffer, size, nmemb)
 
