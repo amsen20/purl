@@ -5,6 +5,7 @@ import purl.http.*
 import purl.http.simple.*
 import purl.http.simple.{ HttpVersion, SimpleRequest }
 import purl.http.CurlRequest
+import purl.internal.FastNativeString
 import purl.unsafe.CurlRuntimeContext
 import scala.util.*
 import shared.TimeOut
@@ -15,7 +16,7 @@ class WebCrawler(
     poller: PassivePoller
 ) extends WebCrawlerBase:
 
-  override def getWebContent(url: String, onResponse: Option[String] => Unit): Unit =
+  override def getWebContent(url: String, onResponse: Option[FastNativeString] => Unit): Unit =
     CurlRequest(
       SimpleRequest(
         HttpVersion.V1_1,

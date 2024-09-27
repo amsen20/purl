@@ -3,6 +3,7 @@ package http
 
 import pollerBear.logger.PBLogger
 import purl.http.simple._
+import purl.internal.FastNativeString
 import purl.internal.Utils
 import purl.unsafe.libcurl_const
 import purl.unsafe.CurlRuntimeContext
@@ -22,7 +23,7 @@ private enum HeaderLine:
 final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
 
   // Mutable shared state.
-  val responseBody: StringBuffer               = StringBuffer()
+  var responseBody: FastNativeString           = FastNativeString()
   val responseHeaders: ArrayBuffer[HeaderLine] = ArrayBuffer[HeaderLine]()
 
   @volatile var isDone = false
@@ -47,7 +48,7 @@ final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
           case HeaderLine.Line(content) => content
         }
 
-        val responseContent = responseBody.toString
+        val responseContent = responseBody
 
         Success(
           SimpleResponse(
@@ -75,7 +76,7 @@ final private[purl] class RequestRecv(onResponse: Try[SimpleResponse] => Unit) {
   ): CSize =
     val amount = size * nmemb
     PBLogger.log("Before receiving content to buffer")
-    responseBody.append(fromCString(buffer))
+    responseBody.append(buffer, amount.toInt)
     PBLogger.log(s"!!!!!!!!!!!!!Received content ${amount} bytes")
 
     amount

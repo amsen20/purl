@@ -82,6 +82,8 @@ object CurlRequest {
       PBLogger.log("cleanUps all cleared")
       onResponse(res)
       PBLogger.log("onResponse called")
+      res.foreach(_.body.free())
+      PBLogger.log("freed the body (if any)")
 
     val (handle, handleCleanedUp) =
       try

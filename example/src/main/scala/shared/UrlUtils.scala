@@ -1,6 +1,7 @@
 package shared
 
 import pollerBear.logger.PBLogger
+import purl.internal.FastNativeString
 import scala.collection.immutable.HashSet
 
 object UrlUtils {
@@ -35,20 +36,29 @@ object UrlUtils {
       // absolute URL
       ifValid(noParamURL, baseURL)
 
-  def findLinks(content: String): List[String] =
-    content.indexOf(INDICATOR) match
-      case -1 => List()
+  def findLinks(content: FastNativeString, from: Int): List[String] =
+    content.indexOf(INDICATOR, from) match
+      case -1 =>
+        List()
       case ind =>
         val start     = ind + INDICATOR.length
         val separator = content(start)
         val end       = content.indexOf(separator, start + 1)
-        if end != -1 then content.substring(start + 1, end) +: findLinks(content.substring(end + 1))
+        if end != -1 then
+          val urlFNS = content.substring(start + 1, end)
+          val url    = urlFNS.toString()
+          urlFNS.free()
+
+          url +: findLinks(
+            content,
+            end + 1
+          )
         else List()
 
-  def extractLinks(url: String, content: String): List[String] =
+  def extractLinks(url: String, content: FastNativeString): List[String] =
     val startTime = System.nanoTime()
     PBLogger.log(s"extracting links")
-    val links = findLinks(content)
+    val links = findLinks(content, 0)
     PBLogger.log(s"finding done")
 
     val baseURL = getBaseURL(url)
