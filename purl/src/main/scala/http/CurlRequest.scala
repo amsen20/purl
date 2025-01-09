@@ -75,9 +75,15 @@ object CurlRequest {
     val cleanUps = ArrayBuffer.empty[() => Unit]
 
     def afterHandleRemoved(res: Try[SimpleResponse]) =
+      PBLogger.log("After handle removed")
       cleanUps.foreach(_())
+      PBLogger.log("cleanUps all called")
       cleanUps.clear()
+      PBLogger.log("cleanUps all cleared")
       onResponse(res)
+      PBLogger.log("onResponse called")
+      res.foreach(_.body.free())
+      PBLogger.log("freed the body (if any)")
 
     val (handle, handleCleanedUp) =
       try
@@ -90,7 +96,7 @@ object CurlRequest {
     cleanUps.addOne(handleCleanedUp)
 
     def onResponseWithCleanUp(res: Try[SimpleResponse]) = {
-      PBLogger.log(s"I am being called and the res is: ${res}")
+      PBLogger.log(s"I am being called and the res is: ${res.getClass()}")
       try
         cc.removeHandle(
           handle.curl,
@@ -112,7 +118,11 @@ object CurlRequest {
       val zone = Zone.open()
       cleanUps.addOne(() => zone.close())
 
-      val sendData = RequestSend(req.body)
+      val sendData = RequestSend(
+        toCString(req.body)(
+          using zone
+        )
+      )
       cc.keepTrack(sendData)
       cleanUps.addOne(() => cc.forget(sendData))
 

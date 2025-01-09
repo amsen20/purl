@@ -4,7 +4,7 @@ package simple
 case class SimpleRequest(
     httpVersion: HttpVersion,
     method: HttpMethod,
-    headers: List[Array[Byte]],
+    headers: List[String],
     uri: String,
-    body: Array[Byte],
+    body: String
 )

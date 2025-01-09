@@ -17,7 +17,7 @@ class CurlRequestSuite extends munit.FunSuite {
   test("simple get request") {
     @volatile var done = false
     CurlGlobal:
-      withPassivePoller { poller =>
+      withPassivePoller(16) { poller =>
         given PassivePoller = poller
         CurlMultiRuntime:
           CurlRequest(
@@ -26,11 +26,11 @@ class CurlRequestSuite extends munit.FunSuite {
               HttpMethod.GET,
               List(),
               "http://localhost:8080/http",
-              "".getBytes()
+              ""
             )
           ) {
             case Success(response) =>
-              assert(response.body.nonEmpty)
+              assert(response.body.length > 0)
               done = true
             case Failure(exception) =>
               fail("couldn't get the response", exception)
@@ -44,7 +44,7 @@ class CurlRequestSuite extends munit.FunSuite {
   test("status code") {
     @volatile var done = false
     CurlGlobal:
-      withPassivePoller { poller =>
+      withPassivePoller(16) { poller =>
         given PassivePoller = poller
         CurlMultiRuntime:
           for statusCode <- List(404, 500) do
@@ -55,7 +55,7 @@ class CurlRequestSuite extends munit.FunSuite {
                 HttpMethod.GET,
                 List(),
                 "http://localhost:8080/http/" + statusCode.toString,
-                "".getBytes()
+                ""
               )
             ) {
               case Success(response) =>
@@ -73,7 +73,7 @@ class CurlRequestSuite extends munit.FunSuite {
   test("error") {
     @volatile var done = false
     CurlGlobal:
-      withPassivePoller { poller =>
+      withPassivePoller(16) { poller =>
         given PassivePoller = poller
         CurlMultiRuntime:
           CurlRequest(
@@ -82,7 +82,7 @@ class CurlRequestSuite extends munit.FunSuite {
               HttpMethod.GET,
               List(),
               "unsupported://server",
-              "".getBytes()
+              ""
             )
           ) {
             case Success(response) =>
@@ -100,7 +100,7 @@ class CurlRequestSuite extends munit.FunSuite {
   test("post echo") {
     @volatile var done = false
     CurlGlobal:
-      withPassivePoller { poller =>
+      withPassivePoller(16) { poller =>
         given PassivePoller = poller
         CurlMultiRuntime:
           for msg <- List("SOME_NOT_RANDOM_STRING_JRWIGJER)$%)##@R") do
@@ -110,11 +110,11 @@ class CurlRequestSuite extends munit.FunSuite {
                 HttpMethod.POST,
                 List(),
                 "http://localhost:8080/http/echo",
-                msg.getBytes()
+                msg
               )
             ) {
               case Success(response) =>
-                assert(response.body.map(_.toChar).mkString.contains(msg))
+                assert(response.body.toString().contains(msg))
                 done = true
               case Failure(exception) =>
                 fail("couldn't get the response", exception)

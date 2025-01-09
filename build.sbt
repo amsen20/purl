@@ -28,7 +28,7 @@ ThisBuild / nativeConfig ~= { c =>
   val isWindows = osNameOpt.exists(_.toLowerCase().contains("windows"))
   var platformOptions = if (isMacOs) { // brew-installed curl
     c.withLinkingOptions(c.linkingOptions :+ "-L/usr/local/opt/curl/lib")
-  } else if (isWindows) { // vcpkg-installed curl
+  } else if (isWindows) { // vcpkg-installed curl 
     c.withCompileOptions(c.compileOptions :+ s"-I${vcpkgBaseDir}/installed/x64-windows/include/")
       .withLinkingOptions(c.linkingOptions :+ s"-L${vcpkgBaseDir}/installed/x64-windows/lib/")
   } else c
@@ -46,6 +46,7 @@ ThisBuild / nativeConfig ~= { c =>
   else
     platformOptions
       .withMode(Mode.releaseFull)
+      .withSourceLevelDebuggingConfig(_.enableAll)
       .withOptimize(true)
 }
 
@@ -61,7 +62,7 @@ def when(pred: => Boolean)(refs: CompositeProject*) = if (pred) refs else Nil
 
 lazy val modules = List(
   purl,
-  gearsPurl,
+  gearsPurl,  
   example,
   testServer
 )

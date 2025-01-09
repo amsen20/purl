@@ -17,6 +17,7 @@ object Experiment:
     println(s"found=${crawler.found.size}")
     println(s"totalChars=${crawler.charsDownloaded}")
     println(s"overheadTime=${elapsedTime - timeout}")
+    println(s"stats time=${UrlUtils.totalElapsedTime}")
 
     if DEBUG then
       println("Explored links:")
