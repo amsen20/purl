@@ -1,11 +1,10 @@
-# gurl
+# pURL
 
-## Introduction
-A *HTTP* client on [Scala Native](https://github.com/scala-native/scala-native/), backed by [libcurl](https://curl.se/libcurl/). Check out a simple [web crawler](https://github.com/amsen20/gurl/blob/direct_scala/example/src/main/scala/Main.scala).
+A *HTTP* client on [Scala Native](https://github.com/scala-native/scala-native/), backed by [libcurl](https://curl.se/libcurl/) and [PollerBear](https://github.com/amsen20/pollerBear). Check out a simple [web crawler](https://github.com/amsen20/web-crawlers-bench/tree/main/single-threaded/src/main/scala).
 
-- Non-blocking, with support for running multiple concurrent requests in parallel
-- Multi-threaded, Can be used by wrapping the requests in any [gears](https://github.com/lampepfl/gears) Source types (like Future) and can be executed in multiple threads
-- Direct Scala, used in a direct scala way with no need for complicated monads or implicits.
+- Compatible with different concurrency libraries, without the need for re-implementation (check out its interface to [Gears](https://github.com/lampepfl/gears) in [here](https://github.com/amsen20/purl/blob/main/gearsPurl/src/main/scala/GearsRequest.scala))
+- Thread-safe, it works with passive pollers that are run on your custom thread-pool or pollerBear active poller.
+- Written in fully direct Scala, which enables benefiting from all static analysis tools developed for Scala (or in its type system).
 
 ## Setup
 TBD, The library will be published whenever [gears](https://github.com/lampepfl/gears) is published. 
